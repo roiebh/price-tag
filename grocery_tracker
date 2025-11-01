@@ -392,6 +392,26 @@
       transition: opacity 0.2s;
       z-index: 10;
     }
+    
+    /* NEW: Favorite Star Action - Moved to bottom left */
+    .action-btn.favorite {
+      background: none;
+      color: #f59e0b; /* Yellow color */
+      font-size: 0.9rem;
+      width: 24px;
+      height: 24px;
+      position: absolute;
+      bottom: 0.2rem; /* CHANGED FROM top */
+      top: auto;      /* Ensures no conflict */
+      left: 0.2rem;
+      opacity: 1;
+      box-shadow: none;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    .action-btn.favorite:hover {
+        transform: scale(1.1);
+        background: rgba(255, 255, 255, 0.5);
+    }
 
     .action-btn {
       width: 20px;
@@ -538,7 +558,8 @@
       cursor: pointer;
       transition: all 0.2s;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      aspect-ratio: 1/1;
+      /* aspect-ratio: 1/1; <-- REMOVED */
+      min-height: 120px; /* Added min-height instead */
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -1281,6 +1302,52 @@
       color: #64748b;
       margin-bottom: 0.75rem;
     }
+    
+    /* NEW: Suggested Items Container */
+    .suggested-items-container {
+      padding: 0.75rem;
+      background: #f1f5f9;
+      border-bottom: 1px solid #e2e8f0;
+      margin-bottom: 0.75rem;
+    }
+    .suggested-items-container h4 {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #374151;
+      margin-bottom: 0.5rem;
+    }
+    .suggested-items-grid {
+      display: flex;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding-bottom: 0.2rem;
+    }
+    .suggested-item {
+      flex-shrink: 0;
+      width: 80px;
+      text-align: center;
+      background: white;
+      border: 1px solid #cbd5e1;
+      border-radius: 0.5rem;
+      padding: 0.5rem 0.2rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .suggested-item:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .suggested-icon {
+      font-size: 1.5rem;
+      margin-bottom: 0.2rem;
+    }
+    .suggested-name {
+      font-size: 0.65rem;
+      font-weight: 500;
+      line-height: 1.2;
+      height: 1.8rem; /* Fixed height for two lines of text */
+      overflow: hidden;
+    }
   </style>
 
 </head>
@@ -1399,6 +1466,13 @@
         <div class="search-bar">
           <input type="text" class="search-input" placeholder="Search products to add..." id="listProductSearch">
         </div>
+        
+        <!-- Suggested Items Container (NEW) -->
+        <div id="suggestedItemsContainer">
+          <!-- Suggested items will be rendered here -->
+        </div>
+        <!-- END Suggested Items Container -->
+        
         <div class="product-list" id="listItemsContainer">
           <!-- List items will be populated here -->
         </div>
@@ -1416,6 +1490,15 @@
       <!-- Settings Screen -->
       <div class="screen" id="settingsScreen">
         <div class="settings-list">
+          <!-- New Favorites Setting Item -->
+          <div class="setting-item" id="favoritesSetting">
+            <div>
+              <div class="setting-label">Manage Favorites</div>
+              <div class="setting-value" id="favoriteCount">0 items</div>
+            </div>
+          </div>
+          <!-- End New Favorites Setting Item -->
+          
           <div class="setting-item" id="countrySetting">
             <div>
               <div class="setting-label">Country/Region</div>
@@ -1430,6 +1513,26 @@
           </div>
         </div>
       </div>
+      
+      <!-- NEW: Favorites Screen -->
+      <div class="screen" id="favoritesScreen">
+        <!-- Search Bar for adding to favorites -->
+        <div class="search-bar">
+            <input type="text" class="search-input" placeholder="Search products to add to favorites..." id="favoriteProductSearch">
+        </div>
+        
+        <!-- Favorites List and Search Results -->
+        <div class="product-list">
+             <!-- Search results will be populated here -->
+            <div class="product-grid" id="favoriteSearchResults" style="display: none;"></div>
+            
+             <!-- Favorite products list -->
+            <div class="product-grid" id="favoritesList">
+                <!-- Favorite products will be populated here in a 4-column grid -->
+            </div>
+        </div>
+      </div>
+      <!-- END Favorites Screen -->
 
     </div> <!-- End Main Content -->
 
@@ -1922,6 +2025,11 @@
     let currentEditingPrice = null; // New state for price editing
     let currentEditingStore = null; // New state for store editing
     let storeSortOrder = 'name'; // New state for store sorting
+    let currentEditingProduct = null;
+    let currentDeletingItem = null;
+    let currentEditingList = null;
+    let currentDeletingList = null;
+
 
     // Default configuration (replaces elementSdk)
     const defaultConfig = {
@@ -2269,9 +2377,22 @@
       // Default icon
       'Unknown': '📦'
     };
+    
+    // Essential products list for suggestions (for non-favorite suggestions)
+    const essentialProducts = [
+        'Large White Eggs (Dozen)',
+        '2% Milk (Lactaid)',
+        'Whole Wheat Bread',
+        'Russet Potatoes',
+        'Yellow Onions',
+        'Ground Beef 80/20 (1lb)',
+        'Canned Diced Tomatoes',
+        'All-Purpose Flour (5lb Bag)',
+        'Bottled Water (24-Pack)'
+    ];
 
     const stores = {
-      CA: ['Loblaws', 'Sobeys', 'Metro', 'Walmart Canada', 'Costco', 'Real Canadian Superstore', 'No Frills', 'FreshCo', 'Food Basics', 'Safeway', 'Whole Foods Market', 'Nations Fresh Foods', 'Pusateri\'s', 'Longo\'s', 'T&T Supermarket'],
+      CA: ['Loblaws', 'Sobeys', 'Metro', 'Walmart Canada', 'Costco', 'Real Canadian Superstore', 'No Frills', 'FreshCo', 'Food Basics', 'Safeway', 'Whole Foods Market', 'Nations Fresh Foods', 'Pusateri\'s', 'Longo\'s', 'T&T Supermarket', 'Dollarama'],
       US: ['Walmart', 'Costco', 'Kroger', 'Whole Foods Market', 'Safeway', 'Target', 'Trader Joe\'s', 'Publix', 'Aldi', 'H-E-B', 'Meijer', 'Wegmans', 'Sprouts Farmers Market', 'Sam\'s Club', 'Food Lion', 'Piggly Wiggly', 'Giant Food', 'The Fresh Market', 'Albertsons', 'Vons'],
       UK: ['Tesco', 'ASDA', 'Sainsbury\'s', 'Morrisons', 'Aldi', 'Lidl']
     };
@@ -2313,125 +2434,206 @@
         });
     }
 
-
     //==============================================
-    // DATA SDK MOCK (using localStorage)
+    // LOCAL STORAGE DATA MOCK (Replaces Firestore)
     //==============================================
-    const DATA_KEY = 'groceryData_v2'; // Updated key for potential data structure changes
+    const LS_KEY = 'groceryTrackerData';
+    let timeoutId = null;
 
-    const dataHandler = {
-      onDataChanged(data) {
-        allData = data;
-        updateCurrentView();
-      }
-    };
-
-    // This function saves the `allData` array to localStorage
-    function saveData() {
-      localStorage.setItem(DATA_KEY, JSON.stringify(allData));
-      // Notify the handler that data has changed
-      dataHandler.onDataChanged(allData);
+    function saveToLocalStorage(data) {
+        try {
+            localStorage.setItem(LS_KEY, JSON.stringify(data));
+        } catch (e) {
+            console.error("Error saving to localStorage:", e);
+        }
     }
 
-    // This object mocks the original dataSdk
-    window.dataSdk = {
-      init: async (handler) => {
+    function loadFromLocalStorage() {
         try {
-          const storedData = localStorage.getItem(DATA_KEY);
-          const data = storedData ? JSON.parse(storedData) : [];
-          // Assign unique IDs if missing (for old data compatibility)
-          data.forEach(item => {
-            if (!item.id) {
-              item.id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
+            const data = localStorage.getItem(LS_KEY);
+            return data ? JSON.parse(data) : [];
+        } catch (e) {
+            console.error("Error loading from localStorage:", e);
+            return [];
+        }
+    }
+
+    // Generates a unique ID
+    function generateId() {
+        return Date.now().toString() + Math.random().toString(36).substring(2, 9);
+    }
+
+    const dataHandler = {
+        onDataChanged(data) {
+            allData = data;
+            updateFavoriteCount(); // NEW: Update the favorite count display
+            updateCurrentView();
+        }
+    };
+
+    // Mock Listener (Simulates onSnapshot update)
+    function triggerUpdate() {
+        if (timeoutId) clearTimeout(timeoutId);
+        // Throttle updates slightly to prevent thrashing
+        timeoutId = setTimeout(() => {
+            const currentData = loadFromLocalStorage();
+            dataHandler.onDataChanged(currentData);
+        }, 50);
+    }
+
+    // Helper to find a product's custom record
+    function getCustomProductRecord(productName) {
+        return allData.find(item => item.type === 'product' && item.name === productName);
+    }
+
+    // Helper to find a product's predefined data
+    function getPredefinedProductData(productName) {
+        let category = 'Unknown';
+        let icon = productIcons[productName] || '📦';
+        for (const [catName, data] of Object.entries(categories)) {
+            if (data.products.includes(productName)) {
+                category = catName;
+                break;
             }
-          });
-          handler.onDataChanged(data);
-          return {
-            isOk: true
-          };
-        } catch (e) {
-          console.error("Failed to load data from localStorage", e);
-          handler.onDataChanged([]); // Start fresh if data is corrupt
-          return {
-            isOk: false
-          };
         }
-      },
+        return { name: productName, category, icon, brand: '', tags: '', isFavorite: false };
+    }
 
-      create: async (item) => {
-        try {
-          if (!item.id) {
-            item.id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
-          }
-          allData.push(item);
-          saveData(); // Calls dataHandler.onDataChanged(allData)
-          return {
-            isOk: true,
-            id: item.id
-          };
-        } catch (e) {
-          console.error("Failed to create item", e);
-          return {
-            isOk: false
-          };
+    // NEW: Toggles the isFavorite flag for a product
+    async function toggleFavorite(productName) {
+        // Prevent action if max item limit is reached, as toggling a predefined item creates a custom record
+        if (allData.length >= 999 && !getCustomProductRecord(productName)) {
+            showToast('Maximum limit of 999 items reached. Cannot add new custom product.', 'error');
+            return;
         }
-      },
-
-      update: async (updatedItem) => {
-        try {
-          const index = allData.findIndex(item => item.id === updatedItem.id);
-          if (index !== -1) {
-            allData[index] = updatedItem;
-            saveData(); // Calls dataHandler.onDataChanged(allData)
-            return {
-              isOk: true
+      
+        const existingRecord = getCustomProductRecord(productName);
+        
+        let targetProduct;
+        
+        if (existingRecord) {
+            // Update existing custom record
+            targetProduct = { 
+                ...existingRecord, 
+                isFavorite: !existingRecord.isFavorite 
             };
-          }
-          return {
-            isOk: false
-          }; // Not found
-        } catch (e) {
-          console.error("Failed to update item", e);
-          return {
-            isOk: false
-          };
+            await window.dataSdk.update(targetProduct);
+        } else {
+            // Create a new custom record for a predefined product
+            const predefined = getPredefinedProductData(productName);
+            targetProduct = {
+                type: 'product',
+                name: productName,
+                brand: '', // Start blank
+                category: predefined.category,
+                icon: predefined.icon,
+                tags: '', // Start blank
+                isFavorite: true, // Set to true on creation
+                createdAt: new Date().toISOString()
+            };
+            await window.dataSdk.create(targetProduct);
         }
-      },
+        
+        showToast(targetProduct.isFavorite ? `${productName} added to favorites ⭐` : `${productName} removed from favorites ☆`);
+        // The triggerUpdate() call inside create/update handles the UI refresh automatically.
+    }
 
-      delete: async (itemToDelete) => {
-        try {
-          allData = allData.filter(item => item.id !== itemToDelete.id);
-          saveData(); // Calls dataHandler.onDataChanged(allData)
-          return {
-            isOk: true
-          };
-        } catch (e) {
-          console.error("Failed to delete item", e);
-          return {
-            isOk: false
-          };
+    window.dataSdk = {
+        init: async (handler) => {
+            // No external services to initialize
+            triggerUpdate();
+            return { isOk: true };
+        },
+
+        create: async (item) => {
+            const currentData = loadFromLocalStorage();
+            const newItem = { ...item, id: generateId(), createdAt: new Date().toISOString() };
+            currentData.push(newItem);
+            saveToLocalStorage(currentData);
+            triggerUpdate();
+            return { isOk: true, id: newItem.id };
+        },
+
+        update: async (updatedItem) => {
+            if (!updatedItem.id) return { isOk: false };
+            let currentData = loadFromLocalStorage();
+            const index = currentData.findIndex(item => item.id === updatedItem.id);
+
+            if (index !== -1) {
+                // Ensure we don't accidentally overwrite the ID during the merge
+                const { id, ...dataToSave } = updatedItem;
+                currentData[index] = { ...currentData[index], ...dataToSave, id: updatedItem.id };
+                saveToLocalStorage(currentData);
+                triggerUpdate();
+                return { isOk: true };
+            }
+            return { isOk: false };
+        },
+
+        delete: async (itemToDelete) => {
+            if (!itemToDelete.id) return { isOk: false };
+            let currentData = loadFromLocalStorage();
+            currentData = currentData.filter(item => item.id !== itemToDelete.id);
+            saveToLocalStorage(currentData);
+            triggerUpdate();
+            return { isOk: true };
+        },
+        
+        deleteBatch: async (items) => {
+            if (items.length === 0) return { isOk: true };
+            let currentData = loadFromLocalStorage();
+            const idsToDelete = new Set(items.map(item => item.id));
+            currentData = currentData.filter(item => !idsToDelete.has(item.id));
+            saveToLocalStorage(currentData);
+            triggerUpdate();
+            return { isOk: true };
         }
-      }
     };
     //==============================================
-    // END OF DATA SDK MOCK
+    // END OF LOCAL STORAGE DATA MOCK
     //==============================================
+    
+    // --- UI Setup Helper ---
+    function setupStoreSortUI() {
+        const storesScreen = document.getElementById('storesScreen');
+        // Create the new segmented control container
+        const storeSortToggleContainer = document.createElement('div');
+        storeSortToggleContainer.id = 'storeSortToggleContainer';
+        storeSortToggleContainer.className = 'search-bar'; // Reuse search-bar styling for padding/spacing
+        storeSortToggleContainer.innerHTML = `
+            <div class="inline-flex rounded-lg bg-gray-100 p-1 text-sm border border-gray-200 mx-auto" style="flex: 1; max-width: 300px;">
+                <button class="sort-option w-1/2 px-3 py-1 rounded-md font-medium transition-all duration-200" data-sort="name">Name (A-Z)</button>
+                <button class="sort-option w-1/2 px-3 py-1 rounded-md font-medium transition-all duration-200" data-sort="cheapest">Cheapest</button>
+            </div>
+        `;
+        // Prepend it *after* the initial search bar and add button
+        const storeGrid = document.getElementById('storeGrid');
+        if (storesScreen && storeGrid) {
+            storesScreen.insertBefore(storeSortToggleContainer, storeGrid);
+        }
+    }
 
 
     // Initialize app
     async function initApp() {
-      // Initialize Data SDK (our localStorage mock)
-      const initResult = await window.dataSdk.init(dataHandler);
+      // 1. Setup static UI elements (like the store sort buttons)
+      setupStoreSortUI();
+      
+      // 2. Setup event listeners
+      setupEventListeners();
+      
+      // 3. Apply initial configuration styles
+      applyConfig(defaultConfig);
+      
+      // 4. Initialize Data SDK (Local Storage connection and listener)
+      const initResult = await window.dataSdk.init(dataHandler); 
       if (!initResult.isOk) {
         showToast('Failed to initialize app', 'error');
       }
-
-      // Apply the default config styling once
-      applyConfig(defaultConfig);
-
-      setupEventListeners();
-      renderCategories();
-      renderStores();
+      
+      // 5. FORCE initial render of the current screen ('categories')
+      // This ensures content is immediately visible.
+      switchScreen(currentScreen);
     }
 
     // This function replaces the original onConfigChange
@@ -2470,6 +2672,28 @@
       if (toggleSwitch) toggleSwitch.style.background = primaryColor;
     }
 
+    // NEW: Updates the favorite count in the settings menu
+    function updateFavoriteCount() {
+        const favoriteCountElement = document.getElementById('favoriteCount');
+        if (!favoriteCountElement) return;
+
+        const favoriteCount = allData.filter(item => item.type === 'product' && item.isFavorite).length;
+        
+        // Also check predefined products that might be favorited but not in custom data
+        const allProductNames = getAllProductNames();
+        let predefinedFavorites = 0;
+        allProductNames.forEach(name => {
+            if (!getCustomProductRecord(name)) { // Only check if no custom record exists
+                // We must iterate over all prices to check if any price record set the favorite status indirectly.
+                // However, the cleanest way to manage favorites is always via the custom product record.
+                // Since the UI now handles creating a custom record on toggle, we only rely on filtering allData.
+                // The logic above (`allData.filter(item => item.type === 'product' && item.isFavorite)`) is sufficient.
+            }
+        });
+        
+        favoriteCountElement.textContent = `${favoriteCount} item${favoriteCount !== 1 ? 's' : ''}`;
+    }
+
 
     // Event listeners
     function setupEventListeners() {
@@ -2497,6 +2721,10 @@
             const storePriceSearchResults = document.getElementById('storePriceSearchResults');
             if (storePriceSearchResults) storePriceSearchResults.style.display = 'none';
             
+            // NEW: Clear favorites search when navigating away
+            const favoriteProductSearch = document.getElementById('favoriteProductSearch');
+            if (favoriteProductSearch) favoriteProductSearch.value = '';
+            
             switchScreen(screen);
           }
         });
@@ -2522,8 +2750,10 @@
       });
 
       // Close dropdown when clicking outside
-      document.addEventListener('click', () => {
-        document.getElementById('countryDropdown').classList.remove('active');
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#countrySelector')) {
+          document.getElementById('countryDropdown').classList.remove('active');
+        }
       });
 
       // Search inputs
@@ -2553,27 +2783,15 @@
         searchProductsForList(e.target.value);
       });
       
-      // --- START REPLACED BLOCK: Store Sort Toggle ---
-      const storesScreen = document.getElementById('storesScreen');
-      // Remove the original search-bar if it was the dropdown (to ensure clean replacement)
-      let existingSortBar = storesScreen.querySelector('.search-bar:nth-child(1)');
-      // If the existing sort bar is the search input bar, we leave it. We are only inserting the *new* one now.
+      // NEW: Favorite Product Search Listener
+      const favoriteProductSearch = document.getElementById('favoriteProductSearch');
+      if (favoriteProductSearch) {
+          favoriteProductSearch.addEventListener('input', (e) => {
+              searchProductsForFavorites(e.target.value);
+          });
+      }
       
-      // Create the new segmented control container
-      const storeSortToggleContainer = document.createElement('div');
-      storeSortToggleContainer.id = 'storeSortToggleContainer';
-      storeSortToggleContainer.className = 'search-bar'; // Reuse search-bar styling for padding/spacing
-      storeSortToggleContainer.innerHTML = `
-          <div class="inline-flex rounded-lg bg-gray-100 p-1 text-sm border border-gray-200 mx-auto" style="flex: 1; max-width: 300px;">
-              <button class="sort-option w-1/2 px-3 py-1 rounded-md font-medium transition-all duration-200" data-sort="name">Name (A-Z)</button>
-              <button class="sort-option w-1/2 px-3 py-1 rounded-md font-medium transition-all duration-200" data-sort="cheapest">Cheapest</button>
-          </div>
-      `;
-      // Prepend it *after* the initial search bar and add button
-      storesScreen.insertBefore(storeSortToggleContainer, document.getElementById('storeGrid'));
-
-
-      // Add the event listener to the buttons
+      // --- Store Sort Toggle Event Listeners ---
       document.querySelectorAll('#storeSortToggleContainer .sort-option').forEach(btn => {
           btn.addEventListener('click', (e) => {
               // Find the closest element with the data-sort attribute
@@ -2588,7 +2806,7 @@
 
       // Initial visual update (must be called after elements are created)
       updateSortButtons();
-      // --- END REPLACED BLOCK ---
+      // --- END Store Sort Toggle Event Listeners ---
 
       // Add buttons
       document.getElementById('addProductBtn').addEventListener('click', () => {
@@ -2675,6 +2893,12 @@
         openModal('unitModal');
         document.getElementById('unitSelect').value = currentUnit;
       });
+      
+      // NEW: Favorites Setting Link
+      document.getElementById('favoritesSetting').addEventListener('click', () => {
+        showSubScreen('favoritesScreen', 'Your Favorites');
+        renderFavorites();
+      });
     }
 
     // Screen management
@@ -2704,6 +2928,11 @@
     }
 
     function goBack() {
+      if (currentScreen === 'favorites') { // Handle specific back from favorites screen
+        switchScreen('settings');
+        return;
+      }
+      
       if (currentProduct) {
         currentProduct = '';
         if (currentCategory) {
@@ -2724,6 +2953,8 @@
       } else if (currentList) {
         currentList = '';
         switchScreen('lists');
+      } else if (currentScreen === 'settings') {
+        switchScreen('categories'); // Default back from settings
       }
     }
 
@@ -2744,6 +2975,10 @@
       } else if (currentList) {
         document.getElementById('headerTitle').textContent = currentList;
         document.getElementById('headerSubtitle').textContent = 'Shopping list items';
+        document.getElementById('backBtn').style.display = 'block';
+      } else if (currentScreen === 'favorites') {
+        document.getElementById('headerTitle').textContent = 'Your Favorites';
+        document.getElementById('headerSubtitle').textContent = 'Easily access your top items';
         document.getElementById('backBtn').style.display = 'block';
       } else {
         document.getElementById('headerTitle').textContent = config.app_title || defaultConfig.app_title;
@@ -2783,6 +3018,88 @@
         });
         grid.appendChild(card);
       });
+    }
+    
+    // NEW: Render Favorites Screen
+    function renderFavorites() {
+        const favoritesGrid = document.getElementById('favoritesList');
+        const searchInput = document.getElementById('favoriteProductSearch');
+        const searchResults = document.getElementById('favoriteSearchResults');
+
+        favoritesGrid.innerHTML = '';
+        searchResults.innerHTML = '';
+        
+        // Check if search is active
+        if (searchInput && searchInput.value.trim() !== '') {
+            searchProductsForFavorites(searchInput.value.trim());
+            return;
+        }
+
+        searchResults.style.display = 'none';
+        favoritesGrid.style.display = 'grid';
+
+        // Display the main favorites list
+        const allProductNames = getAllProductNames();
+        const favoriteProducts = [];
+        
+        allProductNames.forEach(productName => {
+            const customRecord = getCustomProductRecord(productName);
+            if (customRecord && customRecord.isFavorite) {
+                favoriteProducts.push(productName);
+            }
+        });
+        
+        // Show empty state if no favorites and no search is active
+        if (favoriteProducts.length === 0) {
+            // Use an empty element to occupy the space and apply padding/centering
+            favoritesGrid.innerHTML = `<div class="empty-state w-full col-span-4"><div class="empty-icon">⭐</div><p>No favorites yet!</p><p style="font-size: 0.8rem;">Use the search bar above to quickly add an item.</p></div>`;
+            return;
+        }
+
+        // Render favorites list items (4-column grid items)
+        favoriteProducts.forEach(productName => {
+            const prices = allData.filter(item => item.type === 'price' && item.name === productName);
+            const cheapestPrice = getCheapestPrice(prices);
+            let productIcon = getProductIcon(productName);
+            
+            const customProduct = getCustomProductRecord(productName);
+            const brand = customProduct?.brand || '';
+            const tags = customProduct?.tags ? customProduct.tags.split(',').map(t => t.trim()) : [];
+            const category = getProductCategory(productName);
+            const isFavorite = customProduct?.isFavorite || false;
+            
+            // Use product-item structure for rich detail
+            const item = document.createElement('div');
+            item.className = 'product-item'; 
+            item.innerHTML = `
+                <button class="action-btn favorite" 
+                        onclick="event.stopPropagation(); toggleFavorite('${productName.replace(/'/g, "\\'")}')">
+                    ${isFavorite ? '★' : '☆'}
+                </button>
+                <div class="product-actions">
+                    <button class="action-btn add" onclick="event.stopPropagation(); openAddToListModal('${productName.replace(/'/g, "\\'")}')">+</button>
+                    <button class="action-btn duplicate" onclick="event.stopPropagation(); duplicateProduct('${productName.replace(/'/g, "\\'")}')">⧉</button>
+                    ${customProduct ? `<button class="action-btn edit" onclick="event.stopPropagation(); editProduct('${productName.replace(/'/g, "\\'")}')">✎</button>` : ''}
+                    ${customProduct ? `<button class="action-btn delete" onclick="event.stopPropagation(); deleteProduct('${productName.replace(/'/g, "\\'")}')">✕</button>` : ''}
+                </div>
+                <div class="product-icon">${productIcon}</div>
+                <div class="product-info">
+                    <h3>${productName}</h3>
+                    ${brand ? `<div class="product-brand">by ${brand}</div>` : ''}
+                    <div class="product-meta">${prices.length} price${prices.length !== 1 ? 's' : ''} - ${category}</div>
+                    ${tags.length > 0 ? `<div class="product-tags">${tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>` : ''}
+                </div>
+                <div class="price-info">
+                    ${cheapestPrice ? `<div class="price">${currencies[currentRegion]}${cheapestPrice.price.toFixed(2)}</div><div class="ppu">${currencies[currentRegion]}${(cheapestPrice.price / cheapestPrice.quantity).toFixed(2)}/${cheapestPrice.unit}</div>` : `<div class="price">No price</div>`}
+                </div>
+                `;
+            item.addEventListener('click', (e) => {
+                if (!e.target.closest('.action-btn')) {
+                    showProductDetail(productName);
+                }
+            });
+            favoritesGrid.appendChild(item);
+        });
     }
 
     // New function to handle product search on the product screen (cross-category)
@@ -2828,14 +3145,19 @@
             const brand = customProduct?.brand || '';
             const tags = customProduct?.tags ? customProduct.tags.split(',').map(t => t.trim()) : [];
             const category = getProductCategory(productName); // Ensure category is available
+            
+            const isFavorite = customProduct?.isFavorite || false;
 
             const item = document.createElement('div');
             item.className = 'product-item';
             item.innerHTML = `
+                <button class="action-btn favorite" onclick="event.stopPropagation(); toggleFavorite('${productName.replace(/'/g, "\\'")}')">
+                    ${isFavorite ? '★' : '☆'}
+                </button>
                 <div class="product-actions">
                     <button class="action-btn add" onclick="event.stopPropagation(); openAddToListModal('${productName.replace(/'/g, "\\'")}')">+</button>
                     <button class="action-btn duplicate" onclick="event.stopPropagation(); duplicateProduct('${productName.replace(/'/g, "\\'")}')">⧉</button>
-                    <button class="action-btn edit" onclick="event.stopPropagation(); editProduct('${productName.replace(/'/g, "\\'")}')">✎</button>
+                    ${customProduct ? `<button class="action-btn edit" onclick="event.stopPropagation(); editProduct('${productName.replace(/'/g, "\\'")}')">✎</button>` : ''}
                     ${customProduct ? `<button class="action-btn delete" onclick="event.stopPropagation(); deleteProduct('${productName.replace(/'/g, "\\'")}')">✕</button>` : ''}
                 </div>
                 <div class="product-icon">${productIcon}</div>
@@ -2902,9 +3224,15 @@
         const customProduct = allData.find(item => item.type === 'product' && item.name === productName);
         const brand = customProduct?.brand || '';
         const tags = customProduct?.tags ? customProduct.tags.split(',').map(t => t.trim()) : [];
+        
+        const isFavorite = customProduct?.isFavorite || false;
+
         const item = document.createElement('div');
         item.className = 'product-item';
         item.innerHTML = `
+          <button class="action-btn favorite" onclick="event.stopPropagation(); toggleFavorite('${productName.replace(/'/g, "\\'")}')">
+              ${isFavorite ? '★' : '☆'}
+          </button>
           <div class="product-actions">
             <button class="action-btn add" onclick="event.stopPropagation(); openAddToListModal('${productName.replace(/'/g, "\\'")}')">+</button>
             <button class="action-btn duplicate" onclick="event.stopPropagation(); duplicateProduct('${productName.replace(/'/g, "\\'")}')">⧉</button>
@@ -3209,7 +3537,106 @@
       });
     }
 
+    // NEW: Function to render suggested items at the top of the list
+    function renderSuggestedItems() {
+        const container = document.getElementById('suggestedItemsContainer');
+        if (!container) return; // Should always exist on listDetailScreen
+        
+        const list = allData.find(item => item.type === 'list' && item.name === currentList);
+        if (!list) return;
+
+        const currentListItems = allData.filter(item => item.type === 'listItem' && item.listId === list.id).map(item => item.name);
+        
+        let suggestions = [];
+        const MAX_SUGGESTIONS = 5;
+        
+        // 1. Get Favorites
+        const favoriteProducts = allData
+            .filter(item => item.type === 'product' && item.isFavorite)
+            .map(item => item.name);
+            
+        // 2. Add non-duplicate favorites first
+        favoriteProducts.forEach(productName => {
+            if (!currentListItems.includes(productName) && suggestions.length < MAX_SUGGESTIONS) {
+                suggestions.push(productName);
+            }
+        });
+        
+        // 3. Fill remaining slots with essential products
+        essentialProducts.forEach(productName => {
+            if (!currentListItems.includes(productName) && !suggestions.includes(productName) && suggestions.length < MAX_SUGGESTIONS) {
+                suggestions.push(productName);
+            }
+        });
+
+        if (suggestions.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let suggestionsHtml = '<div class="suggested-items-grid">';
+        suggestions.forEach(productName => {
+            const productIcon = getProductIcon(productName);
+            const escapedName = productName.replace(/'/g, "\\'");
+            suggestionsHtml += `
+                <div class="suggested-item" onclick="addSuggestedItemToList('${escapedName}', '${list.id}')">
+                    <div class="suggested-icon">${productIcon}</div>
+                    <div class="suggested-name">${productName}</div>
+                </div>
+            `;
+        });
+        suggestionsHtml += '</div>';
+
+        container.innerHTML = `
+            <div class="suggested-items-container">
+                <h4>Suggested Items (Favorites & Essentials)</h4>
+                ${suggestionsHtml}
+            </div>
+        `;
+    }
+    
+    // NEW: Action to add a suggested item to the current list
+    async function addSuggestedItemToList(productName, listId) {
+        if (!productName || !listId) return;
+
+        if (allData.length >= 999) {
+          showToast('Maximum limit of 999 items reached. Please delete some items first.', 'error');
+          return;
+        }
+
+        const existingItem = allData.find(item =>
+            item.type === 'listItem' &&
+            item.listId === listId &&
+            item.name === productName
+        );
+
+        if (existingItem) {
+            showToast('Item already exists in this list', 'error');
+            return;
+        }
+        
+        const listItemData = {
+            type: 'listItem',
+            name: productName,
+            listId: listId,
+            itemQuantity: 1,
+            checked: false,
+            createdAt: new Date().toISOString()
+        };
+
+        const result = await window.dataSdk.create(listItemData);
+        if (result.isOk) {
+            showToast(`${productName} added to list!`);
+        } else {
+            showToast('Failed to add item to list', 'error');
+        }
+    }
+
+
     function renderListItems() {
+      // Must render suggestions first as they use `currentList`
+      renderSuggestedItems();
+      
       const container = document.getElementById('listItemsContainer');
       container.innerHTML = '';
       const listTotalContainer = document.getElementById('listTotalContainer'); // ADD
@@ -3488,13 +3915,13 @@
       }
     }
     
-    // NEW: Function to move the list order
+    // NEW: Function to move the list order (using mock logic)
     async function moveList(listId, direction) {
-        // 1. Get only the list items (type: 'list') and their current order in allData
+        // Find all lists in the current data set
         const listItemsOnly = allData.filter(item => item.type === 'list');
         const listIndexInOrder = listItemsOnly.findIndex(l => l.id === listId);
 
-        if (listIndexInOrder === -1) return; // Should not happen
+        if (listIndexInOrder === -1) return; 
 
         let targetIndexInOrder = -1;
 
@@ -3507,20 +3934,24 @@
         // Boundary check
         if (targetIndexInOrder < 0 || targetIndexInOrder >= listItemsOnly.length) return;
         
-        // 2. Find the index in the actual allData array
+        // Find the index in the actual allData array (using document ID for safety)
         const currentIndexInAllData = allData.findIndex(item => item.id === listId);
         const targetId = listItemsOnly[targetIndexInOrder].id;
         const targetIndexInAllData = allData.findIndex(item => item.id === targetId);
         
-        // Perform the swap in the global allData array
+        // This is a local swap for immediate visual feedback only.
         if (currentIndexInAllData !== -1 && targetIndexInAllData !== -1) {
             const temp = allData[currentIndexInAllData];
             allData[currentIndexInAllData] = allData[targetIndexInAllData];
             allData[targetIndexInAllData] = temp;
 
-            // Save the entire array back to localStorage to persist the new order
-            saveData(); 
-            showToast('List order updated');
+            // Save the reordered array to localStorage (mocking persistence)
+            saveToLocalStorage(allData);
+
+            // Re-render immediately for visual swap
+            dataHandler.onDataChanged(allData);
+
+            showToast('List order updated locally.');
         }
     }
 
@@ -3547,6 +3978,8 @@
         }
       } else if (currentList) {
         renderListItems();
+      } else if (currentScreen === 'favorites') {
+        renderFavorites();
       } else {
         switch (currentScreen) {
           case 'categories':
@@ -3694,8 +4127,8 @@
       const quantity = parseFloat(document.getElementById('priceQuantity').value);
       const unit = document.getElementById('priceUnit').value;
 
-      if (!productName || !store || !price || !quantity) {
-        showToast('Please fill all fields', 'error');
+      if (!productName || !store || isNaN(price) || isNaN(quantity) || price <= 0) {
+        showToast('Please enter valid price and quantity', 'error');
         return;
       }
 
@@ -3708,7 +4141,6 @@
       const category = getProductCategory(productName);
 
       const priceData = {
-        id: Date.now().toString(),
         type: 'price',
         name: productName,
         category: category,
@@ -3740,8 +4172,8 @@
         const unit = document.getElementById('editPriceUnit').value;
         const store = document.getElementById('editPriceStore').value;
         
-        if (!store || !price || !quantity) {
-            showToast('Please fill all fields', 'error');
+        if (!store || isNaN(price) || isNaN(quantity) || price <= 0) {
+            showToast('Please enter valid price and quantity', 'error');
             return;
         }
         
@@ -3819,13 +4251,13 @@
       }
 
       const productData = {
-        id: Date.now().toString(),
         type: 'product',
         name: name,
         brand: brand,
         category: category,
         icon: icon,
         tags: tagsInput,
+        isFavorite: false, // NEW: Default to false
         createdAt: new Date().toISOString()
       };
 
@@ -3872,7 +4304,6 @@
       }
 
       const storeData = {
-        id: Date.now().toString(),
         type: 'store',
         name: name,
         region: currentRegion,
@@ -3925,6 +4356,7 @@
             const relatedPrices = allData.filter(item => item.type === 'price' && item.store === oldName);
             for (const price of relatedPrices) {
                 const updatedPrice = { ...price, store: name };
+                // Use SDK update mock
                 await window.dataSdk.update(updatedPrice);
             }
             
@@ -3957,10 +4389,11 @@
         document.getElementById('confirmDeleteBtn').onclick = async () => {
             closeModal('deleteConfirmModal');
             try {
-                // Delete prices first
-                for (const price of pricesToDelete) {
-                    await window.dataSdk.delete(price);
+                // Delete prices first using batch delete for efficiency
+                if (pricesToDelete.length > 0) {
+                    await window.dataSdk.deleteBatch(pricesToDelete);
                 }
+                
                 // Delete the store
                 const result = await window.dataSdk.delete(storeToDelete);
                 if (result.isOk) {
@@ -4007,7 +4440,6 @@
       }
 
       const listData = {
-        id: Date.now().toString(),
         type: 'list',
         name: name,
         createdAt: new Date().toISOString()
@@ -4051,7 +4483,6 @@
       }
 
       const categoryData = {
-        id: Date.now().toString(),
         type: 'category',
         name: name,
         icon: icon,
@@ -4082,9 +4513,9 @@
       currentRegion = country;
       updateCountryFlag();
       const countryNames = {
-        CA: '🇨🇦 Canada',
-        US: '🇺🇸 United States',
-        UK: '🇬🇧 UK'
+        CA: '🇨🇦',
+        US: '🇺🇸',
+        UK: '🇬🇧'
       };
       document.getElementById('currentCountry').textContent = countryNames[country];
       renderStores();
@@ -4103,8 +4534,8 @@
       const quantity = parseFloat(document.getElementById('quickQuantity').value);
       const unit = document.getElementById('quickUnit').value;
 
-      if (!name || !category || !store || !price || !quantity) {
-        showToast('Please fill all required fields', 'error');
+      if (!name || !category || !store || isNaN(price) || isNaN(quantity) || price <= 0) {
+        showToast('Please fill all required fields with valid values', 'error');
         return;
       }
 
@@ -4133,13 +4564,13 @@
       // Create product if it doesn't exist
       if (!productExists) {
         const productData = {
-          id: Date.now().toString(),
           type: 'product',
           name: name,
           brand: brand,
           category: category,
           icon: icon,
           tags: tagsInput,
+          isFavorite: false, // NEW: Default to false
           createdAt: new Date().toISOString()
         };
 
@@ -4152,7 +4583,6 @@
 
       // Create price
       const priceData = {
-        id: (Date.now() + 1).toString(), // Ensure unique ID
         type: 'price',
         name: name,
         category: category,
@@ -4199,7 +4629,18 @@
       const pricesList = document.getElementById('pricesList');
       const productIcon = getProductIcon(currentProduct);
       const productCategory = getProductCategory(currentProduct);
+      
+      const customProduct = getCustomProductRecord(currentProduct);
+      const isFavorite = customProduct?.isFavorite || false;
+      
+      // Update header HTML to include favorite toggle button
       header.innerHTML = `
+        <div class="absolute top-2 left-2">
+            <button class="action-btn favorite text-2xl" 
+                    onclick="event.stopPropagation(); toggleFavorite('${currentProduct.replace(/'/g, "\\'")}')">
+                ${isFavorite ? '★' : '☆'}
+            </button>
+        </div>
         <div class="product-detail-icon">${productIcon}</div>
         <div class="product-detail-name">${currentProduct}</div>
         <div class="product-detail-category">${productCategory}</div>`;
@@ -4269,6 +4710,11 @@
       const newListGroup = document.getElementById('newListGroup');
       const existingListGroup = document.getElementById('existingListGroup');
 
+      if (quantity <= 0) {
+          showToast('Quantity must be 1 or more', 'error');
+          return;
+      }
+
       if (newListGroup.style.display !== 'none') {
         // Create new list and add product
         const listName = document.getElementById('quickListName').value.trim();
@@ -4291,9 +4737,7 @@
           showToast('List name already in use', 'error');
           return;
         }
-        const listId = Date.now().toString();
         const listData = {
-          id: listId,
           type: 'list',
           name: listName,
           createdAt: new Date().toISOString()
@@ -4301,10 +4745,9 @@
         window.dataSdk.create(listData).then(result => {
           if (result.isOk) {
             const listItemData = {
-              id: (Date.now() + 1).toString(),
               type: 'listItem',
               name: productName,
-              listId: listId,
+              listId: result.id, // Use the new document ID as the listId
               itemQuantity: quantity,
               checked: false,
               createdAt: new Date().toISOString()
@@ -4346,7 +4789,6 @@
           return;
         }
         const listItemData = {
-          id: Date.now().toString(),
           type: 'listItem',
           name: productName,
           listId: listId,
@@ -4384,10 +4826,6 @@
     }
 
     // Filter functions
-    function filterProducts(query) {
-        // This function is now superseded by performProductSearch for the productScreen search bar
-    }
-
     function filterStores(query) {
       const cards = document.querySelectorAll('.store-card');
       cards.forEach(card => {
@@ -4427,14 +4865,14 @@
         categorySection.className = 'search-section';
         categorySection.innerHTML = '<div class="search-section-title">Categories</div>';
         const categoryResults = document.createElement('div');
-        categoryResults.className = 'category-grid';
+        categoryResults.className = 'product-grid';
         
         matchingCategories.forEach(name => {
           const catData = categories[name] || allData.find(item => item.type === 'category' && item.name === name) || {};
           const icon = catData.icon || '🛒';
           const card = document.createElement('div');
-          card.className = 'category-card';
-          card.innerHTML = `<div class="category-icon">${icon}</div><div class="category-name">${name}</div>`;
+          card.className = 'product-item';
+          card.innerHTML = `<div class="product-icon">${icon}</div><div class="product-info"><h3>${name}</h3><div class="product-meta">Category</div></div><div class="price-info"></div>`;
           card.addEventListener('click', () => {
             currentCategory = name;
             showSubScreen('productsScreen', name);
@@ -4491,9 +4929,14 @@
           const brand = customProduct?.brand || '';
           const tags = customProduct?.tags ? customProduct.tags.split(',').map(t => t.trim()) : [];
           
+          const isFavorite = customProduct?.isFavorite || false;
+
           const item = document.createElement('div');
           item.className = 'product-item';
           item.innerHTML = `
+            <button class="action-btn favorite" onclick="event.stopPropagation(); toggleFavorite('${product.name.replace(/'/g, "\\'")}')">
+                ${isFavorite ? '★' : '☆'}
+            </button>
             <div class="product-actions">
               <button class="action-btn add" onclick="event.stopPropagation(); openAddToListModal('${product.name.replace(/'/g, "\\'")}')">+</button>
               <button class="action-btn duplicate" onclick="event.stopPropagation(); duplicateProduct('${product.name.replace(/'/g, "\\'")}')">⧉</button>
@@ -4504,7 +4947,7 @@
             <div class="product-info">
               <h3>${product.name}</h3>
               ${brand ? `<div class="product-brand">by ${brand}</div>` : ''}
-              <div class="product-meta">${product.category}</div>
+              <div class="product-meta">${product.prices.length} price${product.prices.length !== 1 ? 's' : ''} - ${product.category}</div>
               ${tags.length > 0 ? `<div class="product-tags">${tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>` : ''}
             </div>
             <div class="price-info">
@@ -4526,14 +4969,111 @@
       }
     }
 
+    // NEW: Search function for adding products to favorites from the favorites screen
+    function searchProductsForFavorites(query) {
+        const searchResults = document.getElementById('favoriteSearchResults');
+        const favoritesGrid = document.getElementById('favoritesList');
+
+        if (!query.trim()) {
+            searchResults.style.display = 'none';
+            favoritesGrid.style.display = 'grid';
+            renderFavorites(); // Rerender favorites list
+            return;
+        }
+
+        searchResults.style.display = 'grid'; // Use product-grid style for 4-in-a-row
+        favoritesGrid.style.display = 'none';
+        searchResults.innerHTML = '';
+
+        const lowerQuery = query.toLowerCase();
+        let hasResults = false;
+
+        const allProductNames = getAllProductNames();
+        const matchingProducts = allProductNames.filter(productName => {
+            const prices = allData.filter(item => item.type === 'price' && item.name === productName);
+            const customProduct = allData.find(item => item.type === 'product' && item.name === productName);
+            
+            let searchText = productName.toLowerCase();
+            if (customProduct) {
+                searchText += ` ${customProduct.brand?.toLowerCase() || ''}`;
+                searchText += ` ${customProduct.tags?.toLowerCase() || ''}`;
+            }
+            if (prices.length > 0) {
+                searchText += ` ${prices.map(p => p.store.toLowerCase()).join(' ')}`;
+            }
+
+            return searchText.includes(lowerQuery);
+        });
+
+        if (matchingProducts.length > 0) {
+            hasResults = true;
+            matchingProducts.forEach(productName => {
+                const prices = allData.filter(item => item.type === 'price' && item.name === productName);
+                const cheapestPrice = getCheapestPrice(prices);
+                let productIcon = getProductIcon(productName);
+                
+                const customProduct = getCustomProductRecord(productName);
+                const brand = customProduct?.brand || '';
+                const tags = customProduct?.tags ? customProduct.tags.split(',').map(t => t.trim()) : [];
+                const category = getProductCategory(productName);
+                const isFavorite = customProduct?.isFavorite || false;
+                
+                // Use product-item structure for rich detail
+                const item = document.createElement('div');
+                item.className = 'product-item'; 
+                item.innerHTML = `
+                    <button class="action-btn favorite" 
+                            onclick="event.stopPropagation(); toggleFavorite('${productName.replace(/'/g, "\\'")}')">
+                        ${isFavorite ? '★' : '☆'}
+                    </button>
+                    <div class="product-actions">
+                        <button class="action-btn add" onclick="event.stopPropagation(); openAddToListModal('${productName.replace(/'/g, "\\'")}')">+</button>
+                        <button class="action-btn duplicate" onclick="event.stopPropagation(); duplicateProduct('${productName.replace(/'/g, "\\'")}')">⧉</button>
+                        ${customProduct ? `<button class="action-btn edit" onclick="event.stopPropagation(); editProduct('${productName.replace(/'/g, "\\'")}')">✎</button>` : ''}
+                        ${customProduct ? `<button class="action-btn delete" onclick="event.stopPropagation(); deleteProduct('${productName.replace(/'/g, "\\'")}')">✕</button>` : ''}
+                    </div>
+                    <div class="product-icon">${productIcon}</div>
+                    <div class="product-info">
+                        <h3>${productName}</h3>
+                        ${brand ? `<div class="product-brand">by ${brand}</div>` : ''}
+                        <div class="product-meta">${prices.length} price${prices.length !== 1 ? 's' : ''} - ${category}</div>
+                        ${tags.length > 0 ? `<div class="product-tags">${tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>` : ''}
+                    </div>
+                    <div class="price-info">
+                        ${cheapestPrice ? `<div class="price">${currencies[currentRegion]}${cheapestPrice.price.toFixed(2)}</div><div class="ppu">${currencies[currentRegion]}${(cheapestPrice.price / cheapestPrice.quantity).toFixed(2)}/${cheapestPrice.unit}</div>` : `<div class="price">No price</div>`}
+                    </div>`;
+                item.addEventListener('click', (e) => {
+                    if (!e.target.closest('.action-btn')) {
+                        showProductDetail(productName);
+                    }
+                });
+                searchResults.appendChild(item);
+            });
+        }
+
+        if (!hasResults) {
+            searchResults.innerHTML = `<div class="empty-state w-full col-span-4"><div class="empty-icon">🔍</div><p>No products found for "${query}"</p><p style="font-size: 0.8rem;">Try a different search term or add a new product.</p></div>`;
+        }
+        
+        searchResults.style.display = 'grid';
+        favoritesGrid.style.display = 'none';
+    }
+
+
     function searchProductsForList(query) {
       const searchResults = document.getElementById('listSearchResults');
       const listItemsContainer = document.getElementById('listItemsContainer');
       if (!query.trim()) {
         searchResults.style.display = 'none';
         listItemsContainer.style.display = 'block';
+        // Need to re-render suggested items when search is cleared
+        renderSuggestedItems();
         return;
       }
+      
+      // Hide suggested items when search is active
+      const suggestedItemsContainer = document.getElementById('suggestedItemsContainer');
+      if (suggestedItemsContainer) suggestedItemsContainer.innerHTML = '';
 
       searchResults.style.display = 'block';
       listItemsContainer.style.display = 'none';
@@ -4615,7 +5155,6 @@
                 return;
               }
               const listItemData = {
-                id: Date.now().toString(),
                 type: 'listItem',
                 name: product.name,
                 listId: list.id,
@@ -4729,9 +5268,6 @@
     }
 
     // Product action functions
-    let currentEditingProduct = null;
-    let currentDeletingItem = null;
-
     function duplicateProduct(productName) {
       // Find the custom product to duplicate (or create a temporary object for predefined)
       const customProduct = allData.find(item => item.type === 'product' && item.name === productName);
@@ -4769,13 +5305,14 @@
         const category = getProductCategory(productName);
         const productIcon = getProductIcon(productName);
         customProduct = {
-          id: Date.now().toString(),
+          id: generateId(), // Give it a temporary ID for tracking
           type: 'product',
           name: productName,
           brand: '',
           category: category,
           icon: productIcon,
           tags: '',
+          isFavorite: false, // NEW: Default to false
           createdAt: new Date().toISOString(),
           __isNewCustomProduct: true // Flag to indicate this is a new custom product
         };
@@ -4932,26 +5469,34 @@
             }
             // Delete all related prices
             const relatedPrices = allData.filter(item => item.type === 'price' && item.name === itemName);
-            for (const price of relatedPrices) {
-              await window.dataSdk.delete(price);
-            }
+            // Use batch delete
+            await window.dataSdk.deleteBatch(relatedPrices);
+
             // Delete all related list items
             const relatedListItems = allData.filter(item => item.type === 'listItem' && item.name === itemName);
-            for (const listItem of relatedListItems) {
-              await window.dataSdk.delete(listItem);
-            }
+            // Use batch delete
+            await window.dataSdk.deleteBatch(relatedListItems);
+
         } else if (itemType === 'store' && currentDeletingItem.isCustom) {
              // Delete all related prices for store
             const pricesToDelete = allData.filter(item => item.type === 'price' && item.store === itemName);
-            for (const price of pricesToDelete) {
-                await window.dataSdk.delete(price);
-            }
+            // Use batch delete
+            await window.dataSdk.deleteBatch(pricesToDelete);
+            
             // Delete the store
             const deleteResult = await window.dataSdk.delete(currentDeletingItem);
             if (!deleteResult.isOk) {
                 showToast('Failed to delete store', 'error');
                 return;
             }
+        } else if (itemType === 'category') {
+            // Delete the category
+            const deleteResult = await window.dataSdk.delete(currentDeletingItem);
+            if (!deleteResult.isOk) {
+                showToast('Failed to delete category', 'error');
+                return;
+            }
+            // Note: We don't delete products/prices belonging to this category, just remove the category doc itself.
         }
 
         showToast('Item and related data deleted successfully');
@@ -4963,9 +5508,6 @@
     }
 
     // List management functions
-    let currentEditingList = null;
-    let currentDeletingList = null;
-
     function editList(listId, listName) {
       const list = allData.find(item => item.type === 'list' && item.id === listId);
       if (!list) return;
@@ -5030,9 +5572,9 @@
       try {
         // Delete all list items first
         const listItems = allData.filter(item => item.type === 'listItem' && item.listId === currentDeletingList.id);
-        for (const listItem of listItems) {
-          await window.dataSdk.delete(listItem);
-        }
+        // Use batch delete
+        await window.dataSdk.deleteBatch(listItems);
+        
         // Delete the list
         const deleteResult = await window.dataSdk.delete(currentDeletingList);
         if (!deleteResult.isOk) {
