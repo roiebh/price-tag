@@ -2039,6 +2039,7 @@
     let userId; // Current authenticated user ID
     let isAuthReady = false; // Flag to ensure DB operations wait for auth
     
+    // The following APP_ID is critical for scoping data to this specific app environment
     const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
     // Default configuration (replaces elementSdk)
@@ -2455,32 +2456,53 @@
             return null;
         }
         // Path: /artifacts/{appId}/users/{userId}/{collectionName}
+        // NOTE: We don't use this function often in the final logic, relying on direct `collection(db, ...)` calls.
         return window.firebase.getFirestore().collection(`artifacts/${APP_ID}/users/${userId}/${collectionName}`);
     }
+
+    // ** HARDCODED USER FIREBASE CONFIGURATION **
+    const USER_FIREBASE_CONFIG = {
+        apiKey: "AIzaSyCMbwVpWChw1acukAFPb68_RcvrCiLoHgQ",
+        authDomain: "grocery-pricecheck.firebaseapp.com",
+        projectId: "grocery-pricecheck",
+        storageBucket: "grocery-pricecheck.firebasestorage.app",
+        messagingSenderId: "65520577405",
+        appId: "1:65520577405:web:56b4a139369426b25bfa14",
+        measurementId: "G-BHRV11JC2N"
+    };
 
     // Firestore implementation for Data SDK
     window.dataSdk = {
         init: async (handler) => {
             try {
-                // Initialize Firebase App
-                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-                const app = window.firebase.initializeApp(firebaseConfig);
-                auth = window.firebase.getAuth(app);
-                db = window.firebase.getFirestore(app);
+                // Initialize Firebase App using the hardcoded user configuration
+                const firebaseConfig = USER_FIREBASE_CONFIG;
+                
+                // FIX: Use the direct global function `initializeApp`
+                const app = initializeApp(firebaseConfig);
+                
+                // FIX: Use the direct global function `getAuth`
+                auth = getAuth(app);
+                
+                // FIX: Use the direct global function `getFirestore`
+                db = getFirestore(app);
                 
                 // Sign In using custom token (if available) or anonymously
                 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
                 try {
                     if (initialAuthToken) {
-                        await window.firebase.signInWithCustomToken(auth, initialAuthToken);
+                        // FIX: Use the direct global function `signInWithCustomToken`
+                        await signInWithCustomToken(auth, initialAuthToken);
                     } else {
-                        await window.firebase.signInAnonymously(auth);
+                        // FIX: Use the direct global function `signInAnonymously`
+                        await signInAnonymously(auth);
                     }
                 } catch (e) {
+                    // This catches auth/invalid-custom-token errors in non-Canvas environments
                     console.error("Firebase Sign-In Error (Falling back to Anonymous):", e);
-                    // Fallback for invalid or expired tokens
-                    await window.firebase.signInAnonymously(auth);
+                    // FIX: Use the direct global function `signInAnonymously`
+                    await signInAnonymously(auth);
                 }
                 
                 userId = auth.currentUser.uid;
@@ -2490,9 +2512,10 @@
                 const collectionsToListen = ['product', 'price', 'store', 'list', 'listItem', 'category'];
                 
                 collectionsToListen.forEach(collectionName => {
-                    const colRef = window.firebase.collection(db, `artifacts/${APP_ID}/users/${userId}/${collectionName}`);
+                    // FIX: Use the direct global function `collection` and `onSnapshot`
+                    const colRef = collection(db, `artifacts/${APP_ID}/users/${userId}/${collectionName}`);
                     
-                    window.firebase.onSnapshot(colRef, (snapshot) => {
+                    onSnapshot(colRef, (snapshot) => {
                         const changes = snapshot.docChanges();
                         let newData = [...allData]; // Start with current data
 
@@ -2531,11 +2554,12 @@
             if (!isAuthReady) return { isOk: false };
             try {
                 const itemType = item.type;
-                const colRef = window.firebase.collection(db, `artifacts/${APP_ID}/users/${userId}/${itemType}`);
+                // FIX: Use the direct global function `collection` and `addDoc`
+                const colRef = collection(db, `artifacts/${APP_ID}/users/${userId}/${itemType}`);
                 
                 const { type, ...dataToSave } = item;
                 
-                const docRef = await window.firebase.addDoc(colRef, {
+                const docRef = await addDoc(colRef, {
                     ...dataToSave,
                     createdAt: new Date().toISOString()
                 });
@@ -2549,11 +2573,12 @@
         update: async (updatedItem) => {
             if (!isAuthReady || !updatedItem.id || !updatedItem.type) return { isOk: false };
             try {
-                const docRef = window.firebase.doc(db, `artifacts/${APP_ID}/users/${userId}/${updatedItem.type}`, updatedItem.id);
+                // FIX: Use the direct global function `doc` and `updateDoc`
+                const docRef = doc(db, `artifacts/${APP_ID}/users/${userId}/${updatedItem.type}`, updatedItem.id);
                 
                 const { id, type, ...dataToUpdate } = updatedItem;
                 
-                await window.firebase.updateDoc(docRef, dataToUpdate);
+                await updateDoc(docRef, dataToUpdate);
                 return { isOk: true };
             } catch (e) {
                 console.error("Firestore UPDATE failed:", e);
@@ -2564,8 +2589,9 @@
         delete: async (itemToDelete) => {
             if (!isAuthReady || !itemToDelete.id || !itemToDelete.type) return { isOk: false };
             try {
-                const docRef = window.firebase.doc(db, `artifacts/${APP_ID}/users/${userId}/${itemToDelete.type}`, itemToDelete.id);
-                await window.firebase.deleteDoc(docRef);
+                // FIX: Use the direct global function `doc` and `deleteDoc`
+                const docRef = doc(db, `artifacts/${APP_ID}/users/${userId}/${itemToDelete.type}`, itemToDelete.id);
+                await deleteDoc(docRef);
                 return { isOk: true };
             } catch (e) {
                 console.error("Firestore DELETE failed:", e);
@@ -2576,10 +2602,11 @@
         deleteBatch: async (items) => {
             if (!isAuthReady || items.length === 0) return { isOk: true };
             try {
-                const batch = window.firebase.writeBatch(db);
+                // FIX: Use the direct global functions `writeBatch` and `doc`
+                const batch = writeBatch(db);
                 items.forEach(item => {
                     if (item.id && item.type) {
-                        const docRef = window.firebase.doc(db, `artifacts/${APP_ID}/users/${userId}/${item.type}`, item.id);
+                        const docRef = doc(db, `artifacts/${APP_ID}/users/${userId}/${item.type}`, item.id);
                         batch.delete(docRef);
                     }
                 });
@@ -2591,9 +2618,16 @@
             }
         }
     };
-    //==============================================
-    // END OF FIREBASE/FIRESTORE IMPLEMENTATION
-    //==============================================
+    
+    // ** FIX: Move dataHandler definition outside of initApp scope **
+    const dataHandler = {
+        onDataChanged(data) {
+            allData = data;
+            updateFavoriteCount(); 
+            updateCurrentView();
+        }
+    };
+    // ** END FIX **
     
     // --- UI Setup Helper ---
     function setupStoreSortUI() {
