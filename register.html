@@ -48,15 +48,15 @@
                 <form id="auth-form" class="space-y-5">
                     <div>
                         <label for="auth-email" class="block text-sm font-medium text-gray-700">Email Address</label>
-                        <input type="email" id="auth-email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <input type="email" id="auth-email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" disabled>
                     </div>
                     <div>
                         <label for="auth-password" class="block text-sm font-medium text-gray-700">Password</label>
-                        <input type="password" id="auth-password" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <input type="password" id="auth-password" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" disabled>
                         <p class="text-xs text-gray-400 mt-1">Password must be at least 6 characters.</p>
                     </div>
                     
-                    <button type="submit" id="auth-submit-btn" class="w-full py-2 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150">
+                    <button type="submit" id="auth-submit-btn" class="w-full py-2 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-indigo-400 cursor-not-allowed" disabled>
                         Sign In
                     </button>
                     <p id="auth-error-message" class="text-red-500 text-sm text-center hidden"></p>
@@ -70,7 +70,7 @@
                 </div>
 
                 <!-- Google Sign-In Button -->
-                <button id="google-sign-in-btn" class="w-full flex items-center justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm text-base font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150">
+                <button id="google-sign-in-btn" class="w-full flex items-center justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm text-base font-medium text-gray-700 bg-gray-200 cursor-not-allowed" disabled>
                     <!-- Google SVG Icon -->
                     <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 9.38v2.62h6.15c-.25 1.4-1.12 2.62-2.33 3.4l2.04 1.6C19.82 17.65 22 14.88 22 12c0-2.88-.75-5.5-2.06-7.79l-2.3 1.83C19.16 6.55 20 9.17 20 12c0 2.21-.6 4.31-1.63 6.1l-2.06-1.6c.86-1.5 1.34-3.23 1.34-5.02z" fill="#4285F4"/>
@@ -80,6 +80,7 @@
                     </svg>
                     Sign in with Google
                 </button>
+                <p id="init-status-message" class="text-indigo-500 text-sm text-center mt-4">Initializing Firebase...</p>
             </div>
         </div>
 
@@ -159,6 +160,7 @@
         const authSubmitBtn = document.getElementById('auth-submit-btn');
         const authErrorEl = document.getElementById('auth-error-message');
         const googleSignInBtn = document.getElementById('google-sign-in-btn');
+        const initStatusMessage = document.getElementById('init-status-message');
 
 
         // --- Utility Functions ---
@@ -195,6 +197,34 @@
                 console.log("Firestore notes listener unsubscribed.");
             }
         }
+        
+        // Function to enable/disable auth buttons based on initialization status
+        function setAuthButtonState(enabled) {
+            authEmailInput.disabled = !enabled;
+            authPasswordInput.disabled = !enabled;
+            authSubmitBtn.disabled = !enabled;
+            googleSignInBtn.disabled = !enabled;
+
+            if (enabled) {
+                authSubmitBtn.classList.remove('bg-indigo-400', 'cursor-not-allowed');
+                authSubmitBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700', 'focus:ring-indigo-500');
+                googleSignInBtn.classList.remove('bg-gray-200', 'cursor-not-allowed');
+                googleSignInBtn.classList.add('bg-white', 'hover:bg-gray-50', 'focus:ring-indigo-500', 'border-gray-300', 'text-gray-700');
+                
+                initStatusMessage.textContent = 'Ready to sign in or register.';
+                initStatusMessage.classList.add('text-green-600');
+                initStatusMessage.classList.remove('text-indigo-500');
+            } else {
+                 authSubmitBtn.classList.add('bg-indigo-400', 'cursor-not-allowed');
+                 authSubmitBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700', 'focus:ring-indigo-500');
+                 googleSignInBtn.classList.add('bg-gray-200', 'cursor-not-allowed');
+                 googleSignInBtn.classList.remove('bg-white', 'hover:bg-gray-50', 'focus:ring-indigo-500', 'border-gray-300', 'text-gray-700');
+                 
+                 initStatusMessage.textContent = 'Initializing Firebase...';
+                 initStatusMessage.classList.remove('text-green-600');
+                 initStatusMessage.classList.add('text-indigo-500');
+            }
+        }
 
         // --- Auth Mode Toggle ---
         function setAuthMode(mode) {
@@ -221,12 +251,12 @@
         // --- Firebase Initialization and Auth ---
 
         async function initFirebase() {
-            // REMOVED: Initial hidden/shown state management for loading screen
+            setAuthButtonState(false); // Disable buttons immediately
             contentEl.classList.add('hidden');
             
             if (!firebaseConfig) {
-                displayError("Firebase configuration is missing.");
-                authContainerEl.classList.remove('hidden'); // Ensure auth visible
+                displayAuthError("Firebase configuration is missing.");
+                authContainerEl.classList.remove('hidden'); 
                 return;
             }
 
@@ -237,6 +267,9 @@
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
+                
+                // IMPORTANT: Initialization successful, enable buttons
+                setAuthButtonState(true);
 
                 // Set auth persistence to local to survive browser refreshes
                 await setPersistence(auth, browserLocalPersistence);
@@ -262,13 +295,14 @@
                         
                         // Unsubscribe the listener immediately upon sign out to prevent permission errors
                         unsubscribeAllListeners();
+                        setAuthButtonState(true); // Re-enable for login/register
                     }
-                    // REMOVED: Loading spinner logic
                 });
                 
             } catch (error) {
-                displayError(`Firebase Initialization Failed: ${error.message}`);
+                displayAuthError(`Firebase Initialization Failed: ${error.message}`);
                 authContainerEl.classList.remove('hidden'); // Ensure auth visible on error
+                // Keep buttons disabled if initialization failed
             }
         }
         
@@ -277,6 +311,12 @@
             event.preventDefault();
             authErrorEl.classList.add('hidden');
             
+            // Runtime Guard: Stop execution if Auth is not initialized
+            if (!auth) {
+                displayAuthError("Firebase Auth is not ready. Please wait a moment.");
+                return;
+            }
+
             const email = authEmailInput.value.trim();
             const password = authPasswordInput.value;
 
@@ -322,6 +362,12 @@
         async function handleGoogleSignIn() {
             authErrorEl.classList.add('hidden');
             
+            // Runtime Guard: Stop execution if Auth is not initialized
+            if (!auth) {
+                displayAuthError("Firebase Auth is not ready. Please wait a moment.");
+                return;
+            }
+
             try {
                 const provider = new GoogleAuthProvider();
                 // Sign in using a pop-up window
@@ -462,10 +508,10 @@
                 try {
                     // This signs out the user, which triggers onAuthStateChanged with user=null
                     await signOut(auth);
-                    displayError('Successfully signed out! Please sign in or register below.'); 
+                    displayAuthError('Successfully signed out! Please sign in or register below.'); 
                     console.log('User signed out.');
                 } catch (error) {
-                    displayError(`Sign out failed: ${error.message}`);
+                    displayAuthError(`Sign out failed: ${error.message}`);
                 }
             }
         });
