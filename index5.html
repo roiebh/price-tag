@@ -4070,12 +4070,16 @@
             return;
         }
         
+        // Find the category for the list item
+        const productCategory = getProductCategory(productName);
+        
         const listItemData = {
             type: 'listItem',
             name: productName,
             listId: listId,
             itemQuantity: 1,
             checked: false,
+            category: productCategory, // Added category
             createdAt: new Date().toISOString()
         };
 
@@ -4299,6 +4303,23 @@
       const predefinedProducts = Object.values(categories).flatMap(cat => cat.products);
       const customProducts = allData.filter(item => item.type === 'product').map(p => p.name);
       return [...new Set([...predefinedProducts, ...customProducts])];
+    }
+
+    function getProductCategory(productName) {
+      // 1. Check custom products first
+      const customProduct = allData.find(item => item.type === 'product' && item.name === productName);
+      if (customProduct && customProduct.category) {
+        return customProduct.category;
+      }
+
+      // 2. Check predefined products
+      for (const category in categories) {
+        if (categories[category].products.includes(productName)) {
+          return category;
+        }
+      }
+      // 3. Fallback
+      return 'Unknown';
     }
     
     function getProductIcon(productName) {
@@ -5731,8 +5752,93 @@
         renderStores(); 
     }
     
-    function confirmAddToList() {
-         // Implementation for confirming adding a product to a list
+    async function confirmAddToList() {
+        if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
+
+        const productName = selectedProductForList;
+        const quantity = parseInt(document.getElementById('listQuantity').value);
+        const existingListId = document.getElementById('existingListSelect').value;
+        const newListName = document.getElementById('quickListName').value.trim();
+
+        let listIdToUse = existingListId;
+
+        if (!productName || isNaN(quantity) || quantity <= 0) {
+            showToast('Invalid product or quantity.', 'error');
+            return;
+        }
+        
+        const existingListGroupVisible = document.getElementById('existingListGroup').style.display !== 'none';
+        const newListGroupVisible = document.getElementById('newListGroup').style.display !== 'none';
+
+        if (existingListGroupVisible && existingListId) {
+            // Path 1: Adding to existing list
+            listIdToUse = existingListId;
+            
+        } else if (newListGroupVisible && newListName) {
+            // Path 2: Creating new list and adding item
+            
+            // 2a. Check for name conflict before creating
+            const existingList = allData.find(item =>
+                item.type === 'list' && item.name.toLowerCase() === newListName.toLowerCase()
+            );
+            if (existingList) {
+                showToast(`List name "${newListName}" already exists.`, 'error');
+                return;
+            }
+
+            // 2b. Create the new list document
+            const newListData = {
+                type: 'list',
+                name: newListName,
+                createdAt: new Date().toISOString()
+            };
+            const listResult = await window.dataSdk.create(newListData);
+            
+            if (!listResult.isOk) {
+                showToast('Failed to create new list.', 'error');
+                return;
+            }
+            listIdToUse = listResult.id;
+            
+        } else {
+            showToast('Please select an existing list or enter a name for a new list.', 'error');
+            return;
+        }
+        
+        // 3. Check for item duplicates in the target list
+        const existingItem = allData.find(item =>
+            item.type === 'listItem' &&
+            item.listId === listIdToUse &&
+            item.name === productName
+        );
+        if (existingItem) {
+            showToast(`${productName} is already on this list. Please adjust quantity on the list screen.`, 'error');
+            return;
+        }
+
+        // 4. Create the list item document
+        const productCategory = getProductCategory(productName);
+        const listItemData = {
+            type: 'listItem',
+            name: productName,
+            listId: listIdToUse,
+            itemQuantity: quantity,
+            checked: false,
+            category: productCategory,
+            createdAt: new Date().toISOString()
+        };
+
+        const itemResult = await window.dataSdk.create(listItemData);
+        
+        if (itemResult.isOk) {
+            showToast(`${productName} added to list successfully!`);
+            closeModal('addToListModal');
+            // Clean up inputs
+            document.getElementById('quickListName').value = '';
+            document.getElementById('listQuantity').value = '1';
+        } else {
+            showToast('Failed to add item to list.', 'error');
+        }
     }
     
     // List management functions
