@@ -5756,6 +5756,32 @@
          // Implementation for confirming adding a product to a list
     }
     
+    // List management functions
+    function populateExistingLists() {
+        const select = document.getElementById('existingListSelect');
+        select.innerHTML = '';
+        const existingLists = allData.filter(item => item.type === 'list');
+        
+        if (existingLists.length === 0) {
+            select.innerHTML = '<option value="">No lists found</option>';
+            document.getElementById('confirmAddToListBtn').disabled = true;
+            return;
+        }
+
+        existingLists.forEach(list => {
+            const option = document.createElement('option');
+            option.value = list.id;
+            option.textContent = list.name;
+            select.appendChild(option);
+        });
+        document.getElementById('confirmAddToListBtn').disabled = false;
+    }
+
+    // Utility to generate unique ID (needed for local mocks/predefined logic)
+    function generateId() {
+        return Math.random().toString(36).substring(2, 9);
+    }
+
     // EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR INLINE HTML HANDLERS (CRITICAL FIX)
     // All functions called from onclick="..." must be exposed here.
     window.toggleFavorite = toggleFavorite;
@@ -5775,7 +5801,7 @@
     window.addSuggestedItemToList = addSuggestedItemToList;
     window.toggleGrouping = toggleGrouping; 
     window.showProductSuggestions = showProductSuggestions; 
-    window.filterStores = filterStores; // NOW EXPOSED
+    window.filterStores = filterStores; 
     window.confirmAddToList = confirmAddToList; 
     window.openQuickAddModal = openQuickAddModal; 
     window.populateExistingLists = populateExistingLists; 
