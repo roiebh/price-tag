@@ -248,10 +248,6 @@
                 // Set auth persistence to local to survive browser refreshes
                 await setPersistence(auth, browserLocalPersistence);
 
-                // FIX 1: REMOVED forced initial sign-in logic (signInWithCustomToken/signInAnonymously)
-                // This ensures we skip the step that was hanging and immediately let onAuthStateChanged 
-                // handle the initial (unauthenticated) state.
-                
                 // Set up the authentication state listener
                 onAuthStateChanged(auth, async (user) => {
                     
@@ -263,32 +259,33 @@
                         // Added a short delay to mitigate race condition with token propagation.
                         setTimeout(loadNotes, 50); 
                     } else {
-                        // FIX 2: When user is null, we ONLY show the login UI.
+                        // When user is null, we ONLY show the login UI.
                         userId = null;
                         userIdDisplayEl.textContent = '...';
                         notesListEl.innerHTML = ''; // Clear notes
                         contentEl.classList.add('hidden');
                         authContainerEl.classList.remove('hidden');
                         
-                        // FIX 3: Unsubscribe the listener immediately upon sign out to prevent permission errors
+                        // Unsubscribe the listener immediately upon sign out to prevent permission errors
                         unsubscribeAllListeners();
                     }
                     // Hiding the loader here is the best practice for state transition
                     loadingEl.classList.add('hidden'); 
                 });
                 
-                // --- GUARANTEED UNBLOCK FALLBACK ---
-                // If the onAuthStateChanged listener is delayed, this ensures the UI unblocks
-                // This is now purely a safety net against extremely slow network/server responses.
+                // --- AGGRESSIVE UNBLOCK STRATEGY ---
+                // After a minimal delay (200ms), check if the loading indicator is still visible.
+                // If it is, force it off and show the login screen. This guarantees the UI unblocks.
                 setTimeout(() => {
-                    if (loadingEl.classList.contains('hidden')) return; // Already resolved
-                    loadingEl.classList.add('hidden');
-                    // If stuck, ensure the authentication UI is displayed so the user can proceed
-                    if (auth.currentUser === null) {
-                         authContainerEl.classList.remove('hidden');
+                    if (!loadingEl.classList.contains('hidden')) {
+                         loadingEl.classList.add('hidden');
+                         // Show login/register screen immediately if we are stuck and not authenticated
+                         if (auth.currentUser === null) {
+                             authContainerEl.classList.remove('hidden');
+                         }
+                         console.warn("Loading indicator aggressively unblocked after 200ms delay.");
                     }
-                    console.warn("Loading indicator force-hidden after 5 seconds."); 
-                }, 5000);
+                }, 200);
 
 
             } catch (error) {
