@@ -265,6 +265,12 @@
                 setLogLevel('debug');
                 
                 app = initializeApp(firebaseConfig);
+                
+                // CRUCIAL FIX: Explicitly check if the app object is valid immediately after initialization
+                if (!app) {
+                    throw new Error("initializeApp returned an invalid or undefined app object.");
+                }
+
                 auth = getAuth(app);
                 db = getFirestore(app);
                 
