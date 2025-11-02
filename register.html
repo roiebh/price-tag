@@ -143,15 +143,15 @@
             measurementId: "G-BHRV11JC2N"
         };
 
-        // Global variables provided by the environment, with fallback logic
+        // --- Configuration Logic ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : FALLBACK_FIREBASE_CONFIG.appId;
         
         let firebaseConfig = FALLBACK_FIREBASE_CONFIG;
         if (typeof __firebase_config !== 'undefined' && __firebase_config) {
             try {
                 const envConfig = JSON.parse(__firebase_config);
-                // Check if the parsed object is non-empty before overriding the fallback
-                if (Object.keys(envConfig).length > 0) {
+                // Only override the fallback if the environment config is a valid, non-empty object
+                if (envConfig && typeof envConfig === 'object' && Object.keys(envConfig).length > 0) {
                     firebaseConfig = envConfig;
                 }
             } catch (e) {
@@ -159,6 +159,10 @@
             }
         }
         
+        // Final sanity check before use
+        const IS_CONFIG_VALID = firebaseConfig && typeof firebaseConfig === 'object' && firebaseConfig.apiKey;
+
+
         let app, db, auth;
         let userId = null;
         let authMode = 'login'; // 'login' or 'register'
@@ -276,12 +280,12 @@
             setAuthButtonState(false); // Disable buttons immediately
             contentEl.classList.add('hidden');
             
-            // NOTE: The check for missing config is now redundant because a FALLBACK_FIREBASE_CONFIG is always used.
-            // if (!firebaseConfig) {
-            //     displayAuthError("Firebase configuration is missing.");
-            //     authContainerEl.classList.remove('hidden'); 
-            //     return;
-            // }
+            // CRITICAL CHECK: If configuration is invalid, stop immediately.
+            if (!IS_CONFIG_VALID) {
+                displayAuthError("FATAL ERROR: Firebase configuration is missing or invalid. Please provide API Key and Project ID.");
+                authContainerEl.classList.remove('hidden'); 
+                return;
+            }
 
             try {
                 // Set Firestore log level for debugging
