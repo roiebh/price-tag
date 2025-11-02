@@ -140,13 +140,13 @@
         // Global variables provided by the environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; // No longer used
 
         let app, db, auth;
         let userId = null;
         let authMode = 'login'; // 'login' or 'register'
         let unsubscribeFromNotes = null; // Variable to hold the Firestore unsubscribe function
-        let isFirstLoad = true; // Flag to control initial token usage
+        // let isFirstLoad = true; // No longer used
 
         const loadingEl = document.getElementById('loading');
         const contentEl = document.getElementById('content');
@@ -248,17 +248,9 @@
                 // Set auth persistence to local to survive browser refreshes
                 await setPersistence(auth, browserLocalPersistence);
 
-                // FIX 1: Handle mandatory initial token sign-in *outside* the listener.
-                // This will establish the initial session (or anon session) but won't interfere 
-                // with explicit sign-out later. We only do this on the first load.
-                if (isFirstLoad) {
-                     if (initialAuthToken) {
-                        await signInWithCustomToken(auth, initialAuthToken).catch(e => console.error("Custom token sign-in failed:", e));
-                    } else {
-                        await signInAnonymously(auth).catch(e => console.error("Anonymous sign-in failed:", e));
-                    }
-                    isFirstLoad = false;
-                }
+                // FIX 1: REMOVED forced initial sign-in logic (signInWithCustomToken/signInAnonymously)
+                // This ensures we skip the step that was hanging and immediately let onAuthStateChanged 
+                // handle the initial (unauthenticated) state.
                 
                 // Set up the authentication state listener
                 onAuthStateChanged(auth, async (user) => {
@@ -271,9 +263,7 @@
                         // Added a short delay to mitigate race condition with token propagation.
                         setTimeout(loadNotes, 50); 
                     } else {
-                        // FIX 2: When user is null (either signed out or session expired),
-                        // we ONLY show the login UI and explicitly *do not* attempt to sign in anonymously 
-                        // or with the custom token again.
+                        // FIX 2: When user is null, we ONLY show the login UI.
                         userId = null;
                         userIdDisplayEl.textContent = '...';
                         notesListEl.innerHTML = ''; // Clear notes
@@ -289,6 +279,7 @@
                 
                 // --- GUARANTEED UNBLOCK FALLBACK ---
                 // If the onAuthStateChanged listener is delayed, this ensures the UI unblocks
+                // This is now purely a safety net against extremely slow network/server responses.
                 setTimeout(() => {
                     if (loadingEl.classList.contains('hidden')) return; // Already resolved
                     loadingEl.classList.add('hidden');
@@ -296,7 +287,6 @@
                     if (auth.currentUser === null) {
                          authContainerEl.classList.remove('hidden');
                     }
-                    // CHANGED: Increased timeout to 5 seconds.
                     console.warn("Loading indicator force-hidden after 5 seconds."); 
                 }, 5000);
 
