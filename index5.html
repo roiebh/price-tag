@@ -2608,7 +2608,7 @@
 
     const stores = {
       CA: ['Loblaws', 'Sobeys', 'Metro', 'Walmart Canada', 'Costco', 'Real Canadian Superstore', 'No Frills', 'FreshCo', 'Food Basics', 'Safeway', 'Whole Foods Market', 'Nations Fresh Foods', 'Pusateri\'s', 'Longo\'s', 'T&T Supermarket', 'Dollarama'],
-      US: ['Walmart', 'Costco', 'Kroger', 'Whole Foods Market', 'Safeway', 'Target', 'Trader Joe\'s', 'Publix', 'Aldi', 'H-E-B', 'Meijer', 'Wegmans', 'Sprouts Farmers Market', 'Sam\'s Club', 'Food Lion', 'Piggly Wiggly', 'Giant Food', 'The Fresh Market', 'Albertsons', 'Vons'],
+      US: ['Walmart', 'Costco', 'Kroger', 'Whole Foods Market', 'Safeway', 'Target', 'Trader Joe\'s', 'Publix', 'Aldi', 'H-E-B', 'Meijer', 'Wegmans', 'Sprouts Farmers Market', 'Sam\\'s Club', 'Food Lion', 'Piggly Wiggly', 'Giant Food', 'The Fresh Market', 'Albertsons', 'Vons'],
       UK: ['Tesco', 'ASDA', 'Sainsbury\'s', 'Morrisons', 'Aldi', 'Lidl']
     };
 
@@ -2666,6 +2666,7 @@
                 // setLogLevel('Debug'); // Enable this for verbose console logging if needed
                 
                 setAuthButtonState(true); // Initialization successful, enable auth buttons
+                initStatusMessageEl.textContent = 'Firebase connected. Checking authentication status...';
 
                 // Set up the authentication state listener
                 onAuthStateChanged(auth, async (user) => {
@@ -2799,6 +2800,7 @@
             }
             try {
                 const itemType = item.type;
+                // CRITICAL: Ensure the path is correctly constructed using APP_ID and userId
                 const colRef = collection(db, `artifacts/${APP_ID}/users/${userId}/${itemType}`);
                 
                 const { type, ...dataToSave } = item;
@@ -2810,7 +2812,7 @@
                 return { isOk: true, id: docRef.id };
             } catch (e) {
                 console.error("Firestore CREATE failed:", e);
-                showToast(`Failed to create ${item.type}. Check console for permissions error.`, 'error');
+                showToast(`Failed to create ${item.type}. Check console for potential security rule or network errors.`, 'error');
                 return { isOk: false };
             }
         },
@@ -4514,7 +4516,7 @@
     function calculatePPU() {
       const price = parseFloat(document.getElementById('priceAmount').value) || 0;
       const quantity = parseFloat(document.getElementById('priceQuantity').value) || 1;
-      const unit = document.getElementById('priceUnit').value;
+      const unit = document.getElementById('priceUnit').value || currentUnit;
       const ppu = quantity > 0 ? price / quantity : 0;
       document.getElementById('calculatedPPU').textContent =
         `Price per unit: ${currencies[currentRegion]}${ppu.toFixed(2)}/${unit}`;
@@ -4523,7 +4525,7 @@
     function calculateEditPPU() {
       const price = parseFloat(document.getElementById('editPriceAmount').value) || 0;
       const quantity = parseFloat(document.getElementById('editPriceQuantity').value) || 1;
-      const unit = document.getElementById('editPriceUnit').value;
+      const unit = document.getElementById('editPriceUnit').value || currentUnit;
       const ppu = quantity > 0 ? price / quantity : 0;
       document.getElementById('editCalculatedPPU').textContent =
         `Price per unit: ${currencies[currentRegion]}${ppu.toFixed(2)}/${unit}`;
@@ -4532,7 +4534,7 @@
     function calculateQuickPPU() {
       const price = parseFloat(document.getElementById('quickPrice').value) || 0;
       const quantity = parseFloat(document.getElementById('quickQuantity').value) || 1;
-      const unit = document.getElementById('quickUnit').value;
+      const unit = document.getElementById('quickUnit').value || currentUnit;
       const ppu = quantity > 0 ? price / quantity : 0;
       document.getElementById('quickCalculatedPPU').textContent =
         `Price per unit: ${currencies[currentRegion]}${ppu.toFixed(2)}/${unit}`;
@@ -4843,7 +4845,11 @@
     }
 
     async function saveList() {
-      if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
+      if (!isAuthReady) { 
+        showToast("Please sign in to create a list.", 'error'); 
+        return; 
+      }
+      
       const name = document.getElementById('newListName').value.trim();
 
       if (!name) {
@@ -5750,6 +5756,177 @@
     function filterStores(query) {
         // Simple filtering logic applied within renderStores
         renderStores(); 
+    }
+    
+    // NEW: Search Products for List
+    function searchProductsForList(query) {
+        const searchResults = document.getElementById('listSearchResults');
+        const listItemsContainer = document.getElementById('listItemsContainer');
+        const listTotalContainer = document.getElementById('listTotalContainer');
+
+        if (!query.trim()) {
+            searchResults.style.display = 'none';
+            listItemsContainer.style.display = 'block';
+            listTotalContainer.style.display = 'block';
+            renderListItems(); // Re-render the actual list items
+            return;
+        }
+
+        searchResults.style.display = 'block';
+        listItemsContainer.style.display = 'none';
+        listTotalContainer.style.display = 'none';
+        searchResults.innerHTML = '';
+
+        const lowerQuery = query.toLowerCase();
+        let hasResults = false;
+
+        // Search all products (predefined and custom)
+        const allProductNames = getAllProductNames();
+        const productMap = {}; 
+
+        allProductNames.forEach(productName => {
+            const customProduct = getCustomProductRecord(productName);
+            const category = getProductCategory(productName);
+            
+            let searchText = productName.toLowerCase();
+            if (customProduct) {
+                searchText += ` ${customProduct.brand?.toLowerCase() || ''}`;
+                searchText += ` ${customProduct.tags?.toLowerCase() || ''}`;
+            }
+            
+            if (searchText.includes(lowerQuery)) {
+                productMap[productName] = { 
+                    name: productName, 
+                    category: category, 
+                    customProduct: customProduct 
+                };
+            }
+        });
+        
+        const matchingProducts = Object.values(productMap);
+
+        if (matchingProducts.length > 0) {
+            hasResults = true;
+            matchingProducts.forEach(product => {
+                const productIcon = getProductIcon(product.name);
+                const cheapestPrice = getCheapestPriceForProduct(product.name);
+                
+                const item = document.createElement('div');
+                item.className = 'product-item list-style';
+                item.style.cursor = 'pointer';
+                item.innerHTML = `
+                    <div class="product-icon" style="font-size: 1.2rem; margin-right: 0.5rem;">${productIcon}</div>
+                    <div class="product-info">
+                        <h3>${product.name}</h3>
+                        <div class="product-meta">${product.category}</div>
+                    </div>
+                    <div class="price-info" style="min-width: 80px; text-align: right;">
+                        ${cheapestPrice ? `<div class="price" style="font-weight: 500;">Cheapest: ${currencies[currentRegion]}${cheapestPrice.price.toFixed(2)}</div>` : `<div class="price">No Price</div>`}
+                        <div class="ppu"><button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; height: auto;">+ Add to List</button></div>
+                    </div>`;
+                
+                // Add click listener to the whole row
+                item.addEventListener('click', () => {
+                    window.openAddToListModal(product.name);
+                    // Clear search after adding
+                    document.getElementById('listProductSearch').value = '';
+                    searchProductsForList(''); 
+                });
+                searchResults.appendChild(item);
+            });
+        }
+
+        if (!hasResults) {
+            searchResults.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><p>No products found for "${query}"</p></div>`;
+        }
+    }
+    
+    // NEW: Search Products for Favorites
+    function searchProductsForFavorites(query) {
+        const favoritesGrid = document.getElementById('favoritesList');
+        const searchResults = document.getElementById('favoriteSearchResults');
+        
+        if (!query.trim()) {
+            searchResults.style.display = 'none';
+            favoritesGrid.style.display = 'grid';
+            renderFavorites(); // Re-render the main favorites list
+            return;
+        }
+
+        favoritesGrid.style.display = 'none';
+        searchResults.style.display = 'grid';
+        searchResults.innerHTML = '';
+        
+        const lowerQuery = query.toLowerCase();
+        let hasResults = false;
+
+        // Search all products (predefined and custom)
+        const allProductNames = getAllProductNames();
+        const productMap = {}; 
+
+        allProductNames.forEach(productName => {
+            const customProduct = getCustomProductRecord(productName);
+            const category = getProductCategory(productName);
+            
+            let searchText = productName.toLowerCase();
+            if (customProduct) {
+                searchText += ` ${customProduct.brand?.toLowerCase() || ''}`;
+                searchText += ` ${customProduct.tags?.toLowerCase() || ''}`;
+            }
+            
+            if (searchText.includes(lowerQuery)) {
+                productMap[productName] = { 
+                    name: productName, 
+                    category: category, 
+                    customProduct: customProduct 
+                };
+            }
+        });
+        
+        const matchingProducts = Object.values(productMap);
+
+        if (matchingProducts.length > 0) {
+            hasResults = true;
+            matchingProducts.forEach(product => {
+                const productName = product.name;
+                const prices = allData.filter(item => item.type === 'price' && item.name === productName);
+                const cheapestPrice = getCheapestPrice(prices);
+                const productIcon = getProductIcon(productName);
+                const customProduct = product.customProduct;
+                const isFavorite = customProduct?.isFavorite || false;
+                
+                // Use product-item structure for rich detail
+                const item = document.createElement('div');
+                item.className = 'product-item'; 
+                item.innerHTML = `
+                    <button class="action-btn favorite" 
+                            onclick="event.stopPropagation(); window.toggleFavorite('${productName.replace(/'/g, "\\'")}')">
+                        ${isFavorite ? '★' : '☆'}
+                    </button>
+                    <div class="product-actions" style="opacity: 1;">
+                        <button class="action-btn add" onclick="event.stopPropagation(); window.openAddToListModal('${productName.replace(/'/g, "\\'")}')">+</button>
+                    </div>
+                    <div class="product-icon">${productIcon}</div>
+                    <div class="product-info">
+                        <h3>${productName}</h3>
+                        <div class="product-meta">${product.category}</div>
+                    </div>
+                    <div class="price-info">
+                        ${cheapestPrice ? `<div class="price">${currencies[currentRegion]}${cheapestPrice.price.toFixed(2)}</div>` : `<div class="price">No price</div>`}
+                    </div>
+                    `;
+                item.addEventListener('click', (e) => {
+                    if (!e.target.closest('.action-btn')) {
+                        showProductDetail(productName);
+                    }
+                });
+                searchResults.appendChild(item);
+            });
+        }
+
+        if (!hasResults) {
+            searchResults.innerHTML = `<div class="empty-state col-span-4"><div class="empty-icon">🔍</div><p>No products found for "${query}"</p></div>`;
+        }
     }
     
     async function confirmAddToList() {
