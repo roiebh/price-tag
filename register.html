@@ -296,8 +296,9 @@
                     if (auth.currentUser === null) {
                          authContainerEl.classList.remove('hidden');
                     }
-                    console.warn("Loading indicator force-hidden after 2 seconds.");
-                }, 2000);
+                    // CHANGED: Increased timeout to 5 seconds.
+                    console.warn("Loading indicator force-hidden after 5 seconds."); 
+                }, 5000);
 
 
             } catch (error) {
