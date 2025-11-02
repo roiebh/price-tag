@@ -262,7 +262,6 @@
                 
                 // Set up the authentication state listener
                 onAuthStateChanged(auth, async (user) => {
-                    loadingEl.classList.add('hidden'); // Always hide loading after initial check
                     
                     if (user) {
                         userId = user.uid;
@@ -284,7 +283,22 @@
                         // FIX 3: Unsubscribe the listener immediately upon sign out to prevent permission errors
                         unsubscribeAllListeners();
                     }
+                    // Hiding the loader here is the best practice for state transition
+                    loadingEl.classList.add('hidden'); 
                 });
+                
+                // --- GUARANTEED UNBLOCK FALLBACK ---
+                // If the onAuthStateChanged listener is delayed, this ensures the UI unblocks
+                setTimeout(() => {
+                    if (loadingEl.classList.contains('hidden')) return; // Already resolved
+                    loadingEl.classList.add('hidden');
+                    // If stuck, ensure the authentication UI is displayed so the user can proceed
+                    if (auth.currentUser === null) {
+                         authContainerEl.classList.remove('hidden');
+                    }
+                    console.warn("Loading indicator force-hidden after 2 seconds.");
+                }, 2000);
+
 
             } catch (error) {
                 displayError(`Firebase Initialization Failed: ${error.message}`);
