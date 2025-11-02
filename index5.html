@@ -2798,12 +2798,13 @@
                  showToast("Please sign in to save data.", 'error');
                  return { isOk: false };
             }
+            
             try {
                 const itemType = item.type;
+                const { type, ...dataToSave } = item; // Destructure `type` out
+                
                 // CRITICAL: Ensure the path is correctly constructed using APP_ID and userId
                 const colRef = collection(db, `artifacts/${APP_ID}/users/${userId}/${itemType}`);
-                
-                const { type, ...dataToSave } = item;
                 
                 const docRef = await addDoc(colRef, {
                     ...dataToSave,
@@ -2818,11 +2819,16 @@
         },
 
         update: async (updatedItem) => {
-            if (!isAuthReady || !updatedItem.id || !updatedItem.type) return { isOk: false };
+            if (!isAuthReady || !updatedItem.id || !updatedItem.type) { 
+                 console.error("Firestore UPDATE skipped: Auth not ready or missing ID/Type.");
+                 return { isOk: false };
+            }
             try {
-                const docRef = doc(db, `artifacts/${APP_ID}/users/${userId}/${updatedItem.type}`, updatedItem.id);
+                const itemType = updatedItem.type;
+                const docId = updatedItem.id;
+                const { id, type, ...dataToUpdate } = updatedItem; // Destructure `id` and `type` out
                 
-                const { id, type, ...dataToUpdate } = updatedItem;
+                const docRef = doc(db, `artifacts/${APP_ID}/users/${userId}/${itemType}`, docId);
                 
                 await updateDoc(docRef, dataToUpdate);
                 return { isOk: true };
