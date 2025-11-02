@@ -2678,8 +2678,10 @@
                         authScreenEl.classList.remove('active');
                         authScreenEl.style.display = 'none';
                         document.querySelectorAll('.screen').forEach(screen => {
-                            if (screen.id !== 'authScreen') screen.style.display = 'block';
+                            if (screen.id !== 'authScreen') screen.classList.remove('active');
                         });
+                        document.getElementById('categoriesScreen').classList.add('active');
+
                         bottomNavEl.style.display = 'flex';
                         signOutBtnEl.style.display = 'block';
 
@@ -2700,8 +2702,9 @@
                         authScreenEl.classList.add('active');
                         authScreenEl.style.display = 'flex';
                         document.querySelectorAll('.screen').forEach(screen => {
-                            if (screen.id !== 'authScreen') screen.style.display = 'none';
+                            if (screen.id !== 'authScreen') screen.classList.remove('active');
                         });
+                        
                         bottomNavEl.style.display = 'none';
                         signOutBtnEl.style.display = 'none';
                         
@@ -3063,7 +3066,7 @@
         showAuthError(`Initialization Failed: ${initResult.error}`);
         authScreenEl.classList.add('active');
         authScreenEl.style.display = 'flex';
-        document.getElementById('categoriesScreen').style.display = 'none';
+        document.getElementById('categoriesScreen').classList.remove('active');
       } else {
         // If init is OK, onAuthStateChanged will handle the rest
         authScreenEl.classList.add('active'); // Start on auth screen
