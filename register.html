@@ -132,11 +132,33 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, addDoc, onSnapshot, collection, query, where, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global variables provided by the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        // const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; // No longer used
+        // Hardcoded fallback configuration provided by the user in the first query
+        const FALLBACK_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyCMbwVpWChw1acukAFPb68_RcvrCiLoHgQ",
+            authDomain: "grocery-pricecheck.firebaseapp.com",
+            projectId: "grocery-pricecheck",
+            storageBucket: "grocery-pricecheck.firebasestorage.app",
+            messagingSenderId: "65520577405",
+            appId: "1:65520577405:web:56b4a139369426b25bfa14",
+            measurementId: "G-BHRV11JC2N"
+        };
 
+        // Global variables provided by the environment, with fallback logic
+        const appId = typeof __app_id !== 'undefined' ? __app_id : FALLBACK_FIREBASE_CONFIG.appId;
+        
+        let firebaseConfig = FALLBACK_FIREBASE_CONFIG;
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            try {
+                const envConfig = JSON.parse(__firebase_config);
+                // Check if the parsed object is non-empty before overriding the fallback
+                if (Object.keys(envConfig).length > 0) {
+                    firebaseConfig = envConfig;
+                }
+            } catch (e) {
+                console.warn("Could not parse __firebase_config from environment. Using hardcoded fallback config.");
+            }
+        }
+        
         let app, db, auth;
         let userId = null;
         let authMode = 'login'; // 'login' or 'register'
@@ -254,11 +276,12 @@
             setAuthButtonState(false); // Disable buttons immediately
             contentEl.classList.add('hidden');
             
-            if (!firebaseConfig) {
-                displayAuthError("Firebase configuration is missing.");
-                authContainerEl.classList.remove('hidden'); 
-                return;
-            }
+            // NOTE: The check for missing config is now redundant because a FALLBACK_FIREBASE_CONFIG is always used.
+            // if (!firebaseConfig) {
+            //     displayAuthError("Firebase configuration is missing.");
+            //     authContainerEl.classList.remove('hidden'); 
+            //     return;
+            // }
 
             try {
                 // Set Firestore log level for debugging
@@ -268,7 +291,7 @@
                 
                 // CRUCIAL FIX: Explicitly check if the app object is valid immediately after initialization
                 if (!app) {
-                    throw new Error("initializeApp returned an invalid or undefined app object.");
+                    throw new Error("initializeApp failed to return a valid app object.");
                 }
 
                 auth = getAuth(app);
@@ -306,7 +329,7 @@
                 });
                 
             } catch (error) {
-                displayAuthError(`Firebase Initialization Failed: ${error.message}`);
+                displayAuthError(`Firebase Initialization Failed: ${error.message}. Check your API Key and Firebase project settings.`);
                 authContainerEl.classList.remove('hidden'); // Ensure auth visible on error
                 // Keep buttons disabled if initialization failed
             }
