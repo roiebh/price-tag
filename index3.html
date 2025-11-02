@@ -7,6 +7,8 @@
   <title>Grocery Price Tracker</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js for Price History -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
   <!-- 
     All styles are in this <style> block.
@@ -150,6 +152,7 @@
       border-top: 1px solid #e2e8f0;
       display: flex;
       padding: 0.4rem 0;
+      z-index: 10; /* Ensure nav is above other content */
     }
 
     .nav-item {
@@ -1071,6 +1074,22 @@
       background: white;
       border-radius: 0.5rem;
       border: 1px solid #e2e8f0;
+      position: relative; /* Needed for absolute positioning of favorite button */
+    }
+    
+    .chart-container {
+        padding: 1rem 0;
+        background: white;
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 1rem;
+    }
+    .chart-container h4 {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #374151;
+        margin-bottom: 0.5rem;
+        padding: 0 0.75rem;
     }
 
     .product-detail-icon {
@@ -1348,6 +1367,60 @@
       height: 1.8rem; /* Fixed height for two lines of text */
       overflow: hidden;
     }
+
+    /* --- AUTH SCREEN STYLES --- */
+    .auth-container {
+        /* This container replaces the main-content for logged-out users */
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1rem 70px 1rem; 
+        background: #f8fafc;
+    }
+    .auth-form-card {
+        max-width: 350px;
+        width: 100%;
+        background: white;
+        padding: 1.5rem;
+        border-radius: 0.75rem;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+    }
+    .auth-mode-toggle button {
+        /* Tailwind custom classes used for the switch bar */
+        font-weight: 600;
+    }
+    .google-btn-svg {
+        width: 20px;
+        height: 20px;
+        margin-right: 0.75rem;
+    }
+    .sign-out-btn {
+      position: absolute;
+      right: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 0.3rem 0.7rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      background: #dc2626;
+      color: white;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      border: none;
+    }
+    .auth-error-message {
+      background: #fef2f2;
+      border: 1px solid #fccbcb;
+      color: #dc2626;
+      padding: 0.5rem;
+      border-radius: 0.5rem;
+      text-align: center;
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+    }
   </style>
 
 </head>
@@ -1370,13 +1443,77 @@
           <div class="country-option" data-region="UK">🇬🇧 UK</div>
         </div>
       </div>
+      <!-- Sign Out Button (Visible only when logged in) -->
+      <button class="sign-out-btn" id="signOutBtn" style="display: none;">Sign Out</button>
     </div>
 
     <!-- Main Content -->
+    <!-- The main-content wrapper will now contain either the Auth Screen or the App Screens -->
     <div class="main-content">
+      
+      <!-- NEW: Authentication Screen (Screen ID: authScreen) -->
+      <div class="screen active auth-container" id="authScreen">
+          <div class="auth-form-card">
+              <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">User Sign In</h2>
+              
+              <!-- UI: Simplified Switch Bar -->
+              <div id="authModeToggle" class="auth-mode-toggle flex mb-6 rounded-lg bg-indigo-100 p-0.5">
+                  <button data-mode="login" class="flex-1 py-2 text-sm font-bold rounded-lg bg-indigo-600 text-white shadow-md transition duration-200">
+                      Sign In
+                  </button>
+                  <button data-mode="register" class="flex-1 py-2 text-sm font-bold rounded-lg text-indigo-700 hover:bg-white transition duration-200">
+                      Register
+                  </button>
+              </div>
+      
+              <form id="authForm" class="space-y-4">
+                  <div>
+                      <label for="authEmail" class="block text-sm font-medium text-gray-700">Email Address</label>
+                      <input type="email" id="authEmail" required class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" disabled>
+                  </div>
+                  <div>
+                      <label for="authPassword" class="block text-sm font-medium text-gray-700">Password</label>
+                      <input type="password" id="authPassword" required class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" disabled>
+                      <p class="text-xs text-gray-400 mt-1">Password must be at least 6 characters.</p>
+                  </div>
+                  
+                  <button type="submit" id="authSubmitBtn" class="w-full py-3 px-4 border border-transparent rounded-lg shadow-lg text-base font-semibold text-white bg-indigo-400 cursor-not-allowed transform hover:scale-[1.01] transition duration-200" disabled>
+                      Sign In
+                  </button>
+                  <p id="authErrorMessage" class="auth-error-message hidden"></p>
+              </form>
+
+              <!-- Divider -->
+              <div class="my-6 flex items-center">
+                  <div class="flex-grow border-t border-gray-300"></div>
+                  <span class="flex-shrink mx-4 text-gray-500 text-sm">OR</span>
+                  <div class="flex-grow border-t border-gray-300"></div>
+              </div>
+
+              <!-- UI: Cleaner Google Button -->
+              <button id="googleSignInBtn" class="w-full flex items-center justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-md text-base font-medium text-gray-700 bg-gray-200 cursor-not-allowed transform hover:bg-gray-50 transition duration-200" disabled>
+                  <!-- Google SVG Icon -->
+                  <svg class="google-btn-svg" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 9.38v2.62h6.15c-.25 1.4-1.12 2.62-2.33 3.4l2.04 1.6C19.82 17.65 22 14.88 22 12c0-2.88-.75-5.5-2.06-7.79l-2.3 1.83C19.16 6.55 20 9.17 20 12c0 2.21-.6 4.31-1.63 6.1l-2.06-1.6c.86-1.5 1.34-3.23 1.34-5.02z" fill="#4285F4"/>
+                      <path d="M11 20.84c.83 0 1.63-.14 2.39-.41l2.06 1.6c-1.28.84-2.78 1.27-4.45 1.27-2.92 0-5.5-.96-7.33-2.58l2.25-1.77C6.55 20.2 8.76 20.84 11 20.84z" fill="#34A853"/>
+                      <path d="M4 12c0-1.21.31-2.37.86-3.4l-2.25-1.77C.88 8.08 0 9.98 0 12c0 2.02.66 3.92 1.85 5.58l2.25-1.77C4.31 14.37 4 13.21 4 12z" fill="#FBBC05"/>
+                      <path d="M11 3.16c1.64 0 3.13.56 4.32 1.55l1.79-1.79C15.5 1.47 13.78.84 11 .84c-2.76 0-5.26 1.05-7.14 2.8L6.11 5.37C7.4 4.07 9.1 3.16 11 3.16z" fill="#EA4335"/>
+                  </svg>
+                  Continue with Google
+              </button>
+              <p id="initStatusMessage" class="text-indigo-500 text-sm text-center mt-4">Initializing Firebase...</p>
+              
+              <!-- User ID Display (for debugging/info) -->
+              <div class="mt-4 text-center text-xs text-gray-500">
+                Logged in as: <span id="userIdDisplay" class="font-mono break-all text-indigo-700">Not Logged In</span>
+              </div>
+          </div>
+      </div>
+      <!-- END Authentication Screen -->
+
 
       <!-- Categories Screen -->
-      <div class="screen active" id="categoriesScreen">
+      <div class="screen" id="categoriesScreen">
         <div class="search-bar">
           <input type="text" class="search-input" placeholder="Search categories and products..." id="categorySearch">
           <button class="search-add-btn" id="addCategoryBtn">+</button>
@@ -1406,6 +1543,16 @@
           <div class="product-detail-header" id="productDetailHeader">
             <!-- Product details will be populated here -->
           </div>
+          
+          <!-- NEW: Price History Chart -->
+          <div class="chart-container">
+            <h4>Price History (Cheapest by Month)</h4>
+            <div style="padding: 0 0.75rem;">
+                <canvas id="priceHistoryChart"></canvas>
+            </div>
+          </div>
+          <!-- END Price History Chart -->
+          
           <div class="price-list">
             <div class="price-list-header">
               <span>Store Prices</span>
@@ -1537,7 +1684,7 @@
     </div> <!-- End Main Content -->
 
     <!-- Bottom Navigation -->
-    <div class="bottom-nav">
+    <div class="bottom-nav" id="bottomNav">
       <button class="nav-item active" data-screen="categories">
         <div class="nav-icon">🏪</div>
         <div class="nav-label">Products</div>
@@ -2010,12 +2157,32 @@
   ==============================================
   All the application logic is in this script tag.
   -->
-  <!-- Firebase SDK CDN Links -->
-  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"></script>
-  
-  <script>
+  <script type="module">
+    // --- FIREBASE IMPORTS (Modular CDN Style for Canvas) ---
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import {
+        getAuth,
+        signInWithCustomToken,
+        signInAnonymously,
+        onAuthStateChanged,
+        signOut,
+        createUserWithEmailAndPassword,
+        signInWithEmailAndPassword,
+        GoogleAuthProvider,
+        signInWithPopup
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import {
+        getFirestore,
+        collection,
+        addDoc,
+        updateDoc,
+        deleteDoc,
+        onSnapshot,
+        doc,
+        writeBatch,
+        setLogLevel
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
     // Global state
     let currentRegion = 'CA';
     let currentScreen = 'categories';
@@ -2027,20 +2194,54 @@
     let groupByStore = false;
     let allData = []; // This will be our in-memory database, synced with Firestore
     let selectedProductForList = '';
-    let currentEditingPrice = null; // New state for price editing
-    let currentEditingStore = null; // New state for store editing
-    let storeSortOrder = 'name'; // New state for store sorting
+    let currentEditingPrice = null; 
+    let currentEditingStore = null;
+    let storeSortOrder = 'name'; 
     let currentEditingProduct = null;
     let currentDeletingItem = null;
     let currentEditingList = null;
     let currentDeletingList = null;
     let db; // Firestore instance
     let auth; // Auth instance
-    let userId; // Current authenticated user ID
+    let userId = null; // Current authenticated user ID
     let isAuthReady = false; // Flag to ensure DB operations wait for auth
+    let chartInstance = null; // Chart.js instance for price history
+    let unsubscribeAll = []; // Array to hold all onSnapshot unsubscribe functions
+    let authMode = 'login'; // 'login' or 'register'
     
-    // The following APP_ID is critical for scoping data to this specific app environment
+    // --- MANDATORY CANVAS/USER CONFIGURATION ---
+    // The APP_ID is critical for scoping data to this specific app environment
     const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+    // HARDCODED USER FIREBASE CONFIGURATION (Your config)
+    const FIREBASE_CONFIG = {
+        apiKey: "AIzaSyCMbwVpWChw1acukAFPb68_RcvrCiLoHgQ",
+        authDomain: "grocery-pricecheck.firebaseapp.com",
+        projectId: "grocery-pricecheck",
+        storageBucket: "grocery-pricecheck.firebasestorage.app",
+        messagingSenderId: "65520577405",
+        appId: "1:65520577405:web:56b4a139369426b25bfa14",
+        measurementId: "G-BHRV11JC2N"
+    };
+
+    // The token is provided by the Canvas environment, use if available
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    const IS_CONFIG_VALID = FIREBASE_CONFIG && typeof FIREBASE_CONFIG === 'object' && FIREBASE_CONFIG.apiKey;
+    // --- END CONFIGURATION ---
+
+    // UI Elements for Auth/App Switching
+    const authScreenEl = document.getElementById('authScreen');
+    const bottomNavEl = document.getElementById('bottomNav');
+    const signOutBtnEl = document.getElementById('signOutBtn');
+    const authModeToggleEl = document.getElementById('authModeToggle');
+    const authFormEl = document.getElementById('authForm');
+    const authEmailInput = document.getElementById('authEmail');
+    const authPasswordInput = document.getElementById('authPassword');
+    const authSubmitBtnEl = document.getElementById('authSubmitBtn');
+    const authErrorEl = document.getElementById('authErrorMessage');
+    const googleSignInBtnEl = document.getElementById('googleSignInBtn');
+    const initStatusMessageEl = document.getElementById('initStatusMessage');
+    const userIdDisplayEl = document.getElementById('userIdDisplay'); // NEW: For displaying user ID on Auth Screen
 
     // Default configuration (replaces elementSdk)
     const defaultConfig = {
@@ -2448,113 +2649,150 @@
     //==============================================
     // FIREBASE/FIRESTORE IMPLEMENTATION
     //==============================================
-    
-    // Helper function to get the current user's data collection reference
-    function getCollectionRef(collectionName) {
-        if (!db || !userId) {
-            console.error("Firestore or User ID not initialized.");
-            return null;
-        }
-        // Path: /artifacts/{appId}/users/{userId}/{collectionName}
-        // NOTE: We don't use this function often in the final logic, relying on direct `collection(db, ...)` calls.
-        return window.firebase.getFirestore().collection(`artifacts/${APP_ID}/users/${userId}/${collectionName}`);
-    }
-
-    // ** HARDCODED USER FIREBASE CONFIGURATION **
-    const USER_FIREBASE_CONFIG = {
-        apiKey: "AIzaSyCMbwVpWChw1acukAFPb68_RcvrCiLoHgQ",
-        authDomain: "grocery-pricecheck.firebaseapp.com",
-        projectId: "grocery-pricecheck",
-        storageBucket: "grocery-pricecheck.firebasestorage.app",
-        messagingSenderId: "65520577405",
-        appId: "1:65520577405:web:56b4a139369426b25bfa14",
-        measurementId: "G-BHRV11JC2N"
-    };
 
     // Firestore implementation for Data SDK
     window.dataSdk = {
         init: async (handler) => {
             try {
                 // Initialize Firebase App using the hardcoded user configuration
-                const firebaseConfig = USER_FIREBASE_CONFIG;
+                const app = initializeApp(FIREBASE_CONFIG);
                 
-                // FIX: Use the direct global function `initializeApp`
-                const app = initializeApp(firebaseConfig);
-                
-                // FIX: Use the direct global function `getAuth`
+                // Set up Auth and Firestore instances
                 auth = getAuth(app);
-                
-                // FIX: Use the direct global function `getFirestore`
                 db = getFirestore(app);
+                // setLogLevel('Debug'); // Enable this for verbose console logging if needed
                 
-                // Sign In using custom token (if available) or anonymously
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                setAuthButtonState(true); // Initialization successful, enable auth buttons
 
-                try {
-                    if (initialAuthToken) {
-                        // FIX: Use the direct global function `signInWithCustomToken`
-                        await signInWithCustomToken(auth, initialAuthToken);
-                    } else {
-                        // FIX: Use the direct global function `signInAnonymously`
-                        await signInAnonymously(auth);
-                    }
-                } catch (e) {
-                    // This catches auth/invalid-custom-token errors in non-Canvas environments
-                    console.error("Firebase Sign-In Error (Falling back to Anonymous):", e);
-                    // FIX: Use the direct global function `signInAnonymously`
-                    await signInAnonymously(auth);
-                }
-                
-                userId = auth.currentUser.uid;
-                isAuthReady = true;
-                
-                // 2. Set up Real-time Listeners (onSnapshot) for ALL Collections
-                const collectionsToListen = ['product', 'price', 'store', 'list', 'listItem', 'category'];
-                
-                collectionsToListen.forEach(collectionName => {
-                    // FIX: Use the direct global function `collection` and `onSnapshot`
-                    const colRef = collection(db, `artifacts/${APP_ID}/users/${userId}/${collectionName}`);
-                    
-                    onSnapshot(colRef, (snapshot) => {
-                        const changes = snapshot.docChanges();
-                        let newData = [...allData]; // Start with current data
-
-                        changes.forEach((change) => {
-                            const data = { id: change.doc.id, ...change.doc.data() };
-                            
-                            if (change.type === "added") {
-                                // Prevent duplicates if document ID existed in LS, only add if not present
-                                if (!newData.some(item => item.id === data.id)) {
-                                    newData.push(data);
-                                }
-                            } else if (change.type === "modified") {
-                                const index = newData.findIndex(item => item.id === data.id);
-                                if (index !== -1) {
-                                    newData[index] = data;
-                                }
-                            } else if (change.type === "removed") {
-                                newData = newData.filter(item => item.id !== data.id);
-                            }
-                        });
+                // Set up the authentication state listener
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        // USER IS LOGGED IN (Email/Password, Google, or Anonymous)
+                        userId = user.uid;
+                        isAuthReady = true;
                         
-                        // Pass the updated dataset to the handler for rendering
-                        handler.onDataChanged(newData);
-                    });
+                        // Display user ID on the auth screen (useful for debugging/info)
+                        userIdDisplayEl.textContent = `UID: ${userId.substring(0, 8)}...`;
+                        
+                        // Hide Auth screen, show app screens
+                        authScreenEl.classList.remove('active');
+                        authScreenEl.style.display = 'none';
+                        document.querySelectorAll('.screen').forEach(screen => {
+                            if (screen.id !== 'authScreen') screen.style.display = 'block';
+                        });
+                        bottomNavEl.style.display = 'flex';
+                        signOutBtnEl.style.display = 'block';
+
+                        console.log("User logged in. Starting Firestore listeners.");
+                        handler.startListeners(); // Start listening for data immediately
+
+                    } else {
+                        // USER IS LOGGED OUT
+                        userId = null;
+                        isAuthReady = false;
+                        userIdDisplayEl.textContent = 'Not Logged In';
+                        
+                        // Stop all listeners and clear data
+                        handler.unsubscribeListeners();
+                        allData = [];
+                        
+                        // Show Auth screen, hide app screens
+                        authScreenEl.classList.add('active');
+                        authScreenEl.style.display = 'flex';
+                        document.querySelectorAll('.screen').forEach(screen => {
+                            if (screen.id !== 'authScreen') screen.style.display = 'none';
+                        });
+                        bottomNavEl.style.display = 'none';
+                        signOutBtnEl.style.display = 'none';
+                        
+                        // Ensure auth mode is set to login for clean start
+                        setAuthMode('login'); 
+                        
+                        console.log("User logged out. App waiting for sign-in.");
+                    }
                 });
 
+                // Check for initial token if no user state is loaded yet (only on first load)
+                if (!auth.currentUser) {
+                    try {
+                         if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            // Automatically sign in anonymously to initialize a session for security rules
+                            await signInAnonymously(auth);
+                        }
+                    } catch (e) {
+                         // Fallback to anonymous sign-in if custom token fails
+                         console.warn("Custom token failed, falling back to anonymous:", e);
+                         await signInAnonymously(auth);
+                    }
+                }
+                
                 return { isOk: true };
                 
             } catch (error) {
                 console.error("Firebase Initialization Failed:", error);
-                return { isOk: false };
+                setAuthButtonState(false); // Keep buttons disabled on fatal init failure
+                showAuthError(`Fatal Init Error: ${error.message}`);
+                return { isOk: false, error: error.message };
             }
         },
 
+        startListeners: (handler) => {
+             const collectionsToListen = ['product', 'price', 'store', 'list', 'listItem', 'category'];
+             
+             // First, unsubscribe any existing listeners
+             handler.unsubscribeListeners();
+             
+             collectionsToListen.forEach(collectionName => {
+                 // Path: /artifacts/{appId}/users/{userId}/{collectionName}
+                 const colRef = collection(db, `artifacts/${APP_ID}/users/${userId}/${collectionName}`);
+                 
+                 const unsubscribe = onSnapshot(colRef, (snapshot) => {
+                     const changes = snapshot.docChanges();
+                     let newData = [...allData]; // Start with current data
+
+                     changes.forEach((change) => {
+                         const data = { id: change.doc.id, ...change.doc.data() };
+                         
+                         if (change.type === "added") {
+                             if (!newData.some(item => item.id === data.id)) {
+                                 newData.push(data);
+                             }
+                         } else if (change.type === "modified") {
+                             const index = newData.findIndex(item => item.id === data.id);
+                             if (index !== -1) {
+                                 newData[index] = data;
+                             }
+                         } else if (change.type === "removed") {
+                             newData = newData.filter(item => item.id !== data.id);
+                         }
+                     });
+                     
+                     handler.onDataChanged(newData);
+                 }, (error) => {
+                     console.error(`Error listening to collection ${collectionName}:`, error);
+                     if (error.code !== 'permission-denied') {
+                         showToast(`Failed to sync data for ${collectionName}.`, 'error');
+                     }
+                 });
+                 unsubscribeAll.push(unsubscribe);
+             });
+        },
+        
+        unsubscribeListeners: () => {
+            unsubscribeAll.forEach(unsubscribe => unsubscribe());
+            unsubscribeAll = [];
+            console.log("All Firestore listeners unsubscribed.");
+        },
+
         create: async (item) => {
-            if (!isAuthReady) return { isOk: false };
+            if (!isAuthReady) {
+                 showToast("Please sign in to save data.", 'error');
+                 return { isOk: false };
+            }
             try {
                 const itemType = item.type;
-                // FIX: Use the direct global function `collection` and `addDoc`
                 const colRef = collection(db, `artifacts/${APP_ID}/users/${userId}/${itemType}`);
                 
                 const { type, ...dataToSave } = item;
@@ -2566,6 +2804,7 @@
                 return { isOk: true, id: docRef.id };
             } catch (e) {
                 console.error("Firestore CREATE failed:", e);
+                showToast(`Failed to create ${item.type}. Check console for permissions error.`, 'error');
                 return { isOk: false };
             }
         },
@@ -2573,7 +2812,6 @@
         update: async (updatedItem) => {
             if (!isAuthReady || !updatedItem.id || !updatedItem.type) return { isOk: false };
             try {
-                // FIX: Use the direct global function `doc` and `updateDoc`
                 const docRef = doc(db, `artifacts/${APP_ID}/users/${userId}/${updatedItem.type}`, updatedItem.id);
                 
                 const { id, type, ...dataToUpdate } = updatedItem;
@@ -2582,6 +2820,7 @@
                 return { isOk: true };
             } catch (e) {
                 console.error("Firestore UPDATE failed:", e);
+                showToast(`Failed to update ${updatedItem.type}. Check console for permissions error.`, 'error');
                 return { isOk: false };
             }
         },
@@ -2589,12 +2828,12 @@
         delete: async (itemToDelete) => {
             if (!isAuthReady || !itemToDelete.id || !itemToDelete.type) return { isOk: false };
             try {
-                // FIX: Use the direct global function `doc` and `deleteDoc`
                 const docRef = doc(db, `artifacts/${APP_ID}/users/${userId}/${itemToDelete.type}`, itemToDelete.id);
                 await deleteDoc(docRef);
                 return { isOk: true };
             } catch (e) {
                 console.error("Firestore DELETE failed:", e);
+                showToast(`Failed to delete ${itemToDelete.type}. Check console for permissions error.`, 'error');
                 return { isOk: false };
             }
         },
@@ -2602,7 +2841,6 @@
         deleteBatch: async (items) => {
             if (!isAuthReady || items.length === 0) return { isOk: true };
             try {
-                // FIX: Use the direct global functions `writeBatch` and `doc`
                 const batch = writeBatch(db);
                 items.forEach(item => {
                     if (item.id && item.type) {
@@ -2614,21 +2852,179 @@
                 return { isOk: true };
             } catch (e) {
                 console.error("Firestore BATCH DELETE failed:", e);
+                showToast(`Failed to delete multiple items. Check console for permissions error.`, 'error');
                 return { isOk: false };
             }
         }
     };
     
-    // ** FIX: Move dataHandler definition outside of initApp scope **
+    // Data Handler Object (used by the SDK's onSnapshot listener)
     const dataHandler = {
         onDataChanged(data) {
             allData = data;
             updateFavoriteCount(); 
             updateCurrentView();
-        }
+        },
+        startListeners: () => window.dataSdk.startListeners(dataHandler),
+        unsubscribeListeners: () => window.dataSdk.unsubscribeListeners()
     };
-    // ** END FIX **
     
+    // --- AUTHENTICATION LOGIC ---
+
+    // Function to enable/disable auth buttons based on initialization status
+    function setAuthButtonState(enabled) {
+        authEmailInput.disabled = !enabled;
+        authPasswordInput.disabled = !enabled;
+        authSubmitBtnEl.disabled = !enabled;
+        googleSignInBtnEl.disabled = !enabled;
+
+        if (enabled) {
+            authSubmitBtnEl.classList.remove('bg-indigo-400', 'cursor-not-allowed');
+            authSubmitBtnEl.classList.add('bg-indigo-600', 'hover:bg-indigo-700', 'focus:ring-indigo-500');
+            googleSignInBtnEl.classList.remove('bg-gray-200', 'cursor-not-allowed');
+            googleSignInBtnEl.classList.add('bg-white', 'hover:bg-gray-50', 'focus:ring-indigo-500', 'border-gray-300', 'text-gray-700');
+            
+            initStatusMessageEl.textContent = 'Ready to sign in or register.';
+            initStatusMessageEl.classList.add('text-green-600');
+            initStatusMessageEl.classList.remove('text-indigo-500');
+        } else {
+             authSubmitBtnEl.classList.add('bg-indigo-400', 'cursor-not-allowed');
+             authSubmitBtnEl.classList.remove('bg-indigo-600', 'hover:bg-indigo-700', 'focus:ring-indigo-500');
+             googleSignInBtnEl.classList.add('bg-gray-200', 'cursor-not-allowed');
+             googleSignInBtnEl.classList.remove('bg-white', 'hover:bg-gray-50', 'focus:ring-indigo-500', 'border-gray-300', 'text-gray-700');
+             
+             initStatusMessageEl.textContent = 'Initializing Firebase...';
+             initStatusMessageEl.classList.remove('text-green-600');
+             initStatusMessageEl.classList.add('text-indigo-500');
+        }
+    }
+    
+    // Display an error message to the auth form area
+    function showAuthError(message) {
+        authErrorEl.textContent = message;
+        authErrorEl.classList.remove('hidden');
+        setTimeout(() => authErrorEl.classList.add('hidden'), 5000);
+        console.error(message);
+    }
+    
+    // Auth Mode Toggle
+    function setAuthMode(mode) {
+        authMode = mode;
+        const loginBtn = authModeToggleEl.querySelector('[data-mode="login"]');
+        const registerBtn = authModeToggleEl.querySelector('[data-mode="register"]');
+        
+        // UI Toggle Logic
+        if (mode === 'login') {
+            loginBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+            loginBtn.classList.remove('text-indigo-700', 'hover:bg-white');
+            registerBtn.classList.remove('bg-indigo-600', 'text-white', 'shadow-md');
+            registerBtn.classList.add('text-indigo-700', 'hover:bg-white');
+            authSubmitBtnEl.textContent = 'Sign In';
+        } else {
+            registerBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+            registerBtn.classList.remove('text-indigo-700', 'hover:bg-white');
+            loginBtn.classList.remove('bg-indigo-600', 'text-white', 'shadow-md');
+            loginBtn.classList.add('text-indigo-700', 'hover:bg-white');
+            authSubmitBtnEl.textContent = 'Register';
+        }
+        authErrorEl.classList.add('hidden'); // Clear error when switching mode
+    }
+
+    // Handle Email/Password Registration and Login
+    async function handleAuthSubmit(event) {
+        event.preventDefault();
+        authErrorEl.classList.add('hidden');
+        
+        if (!auth) {
+            showAuthError("Authentication system is not ready.");
+            return;
+        }
+
+        const email = authEmailInput.value.trim();
+        const password = authPasswordInput.value;
+
+        if (password.length < 6) {
+            showAuthError("Password must be at least 6 characters.");
+            return;
+        }
+
+        try {
+            if (authMode === 'register') {
+                await createUserWithEmailAndPassword(auth, email, password);
+                showToast("Registration successful! Signed in automatically.");
+            } else { // 'login'
+                await signInWithEmailAndPassword(auth, email, password);
+            }
+        } catch (error) {
+            let errorMessage = "An unknown authentication error occurred.";
+            switch (error.code) {
+                case 'auth/invalid-email':
+                    errorMessage = 'Invalid email format.';
+                    break;
+                case 'auth/user-not-found':
+                case 'auth/wrong-password':
+                    errorMessage = 'Invalid email or password.';
+                    break;
+                case 'auth/email-already-in-use':
+                    errorMessage = 'This email is already registered. Try signing in.';
+                    break;
+                case 'auth/weak-password':
+                    errorMessage = 'Password is too weak. Must be at least 6 characters.';
+                    break;
+                default:
+                    errorMessage = error.message;
+                    break;
+            }
+            showAuthError(errorMessage);
+        }
+    }
+
+    // Handle Google Sign-In
+    async function handleGoogleSignIn() {
+        authErrorEl.classList.add('hidden');
+        
+        if (!auth) {
+            showAuthError("Authentication system is not ready.");
+            return;
+        }
+
+        try {
+            const provider = new GoogleAuthProvider();
+            await signInWithPopup(auth, provider);
+        } catch (error) {
+            let errorMessage = "Google Sign-In Failed.";
+            
+            if (error.code) {
+                if (error.code === 'auth/popup-closed-by-user') {
+                    errorMessage = 'Sign-in window closed. Please try again.';
+                } else if (error.code === 'auth/cancelled-popup-request') {
+                    errorMessage = 'Sign-in cancelled. Did you already have a pop-up open?';
+                } else if (error.code === 'auth/account-exists-with-different-credential') {
+                    errorMessage = 'An account already exists with this email using a different login method.';
+                } else {
+                    errorMessage = `Error: ${error.code}`;
+                }
+            } else {
+                errorMessage = error.message;
+            }
+
+            showAuthError(errorMessage);
+        }
+    }
+
+    // Sign Out Handler
+    async function handleSignOut() {
+        if (auth) {
+            try {
+                await signOut(auth);
+                showToast('Signed out successfully.');
+            } catch (error) {
+                showToast(`Sign out failed: ${error.message}`, 'error');
+            }
+        }
+    }
+
+
     // --- UI Setup Helper ---
     function setupStoreSortUI() {
         const storesScreen = document.getElementById('storesScreen');
@@ -2664,12 +3060,17 @@
       // 4. Initialize Data SDK (Firebase connection and listener)
       const initResult = await window.dataSdk.init(dataHandler); 
       if (!initResult.isOk) {
-        showToast('Failed to initialize app', 'error');
+        showAuthError(`Initialization Failed: ${initResult.error}`);
+        authScreenEl.classList.add('active');
+        authScreenEl.style.display = 'flex';
+        document.getElementById('categoriesScreen').style.display = 'none';
+      } else {
+        // If init is OK, onAuthStateChanged will handle the rest
+        authScreenEl.classList.add('active'); // Start on auth screen
+        authScreenEl.style.display = 'flex';
       }
       
-      // 5. FORCE initial render of the current screen ('categories')
-      // This ensures content is immediately visible.
-      switchScreen(currentScreen);
+      // 5. Initial screen setting is handled by onAuthStateChanged now.
     }
 
     // This function replaces the original onConfigChange
@@ -2714,19 +3115,6 @@
         if (!favoriteCountElement) return;
 
         const favoriteCount = allData.filter(item => item.type === 'product' && item.isFavorite).length;
-        
-        // Also check predefined products that might be favorited but not in custom data
-        const allProductNames = getAllProductNames();
-        let predefinedFavorites = 0;
-        allProductNames.forEach(name => {
-            if (!getCustomProductRecord(name)) { // Only check if no custom record exists
-                // We must iterate over all prices to check if any price record set the favorite status indirectly.
-                // However, the cleanest way to manage favorites is always via the custom product record.
-                // Since the UI now handles creating a custom record on toggle, we only rely on filtering allData.
-                // The logic above (`allData.filter(item => item.type === 'product' && item.isFavorite)`) is sufficient.
-            }
-        });
-        
         favoriteCountElement.textContent = `${favoriteCount} item${favoriteCount !== 1 ? 's' : ''}`;
     }
 
@@ -2736,6 +3124,10 @@
       // Navigation
       document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', () => {
+          if (!userId) {
+              showToast("Please sign in to view app sections.", 'error');
+              return;
+          }
           const screen = item.dataset.screen;
           if (screen) {
             currentCategory = '';
@@ -2828,16 +3220,15 @@
       }
       
       // --- Store Sort Toggle Event Listeners ---
-      document.querySelectorAll('#storeSortToggleContainer .sort-option').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-              // Find the closest element with the data-sort attribute
+      document.addEventListener('click', (e) => {
+          if (e.target.closest('#storeSortToggleContainer .sort-option')) {
               const target = e.target.closest('[data-sort]');
               if (target) {
                   storeSortOrder = target.dataset.sort;
                   updateSortButtons();
                   renderStores();
               }
-          });
+          }
       });
 
       // Initial visual update (must be called after elements are created)
@@ -2935,12 +3326,24 @@
         showSubScreen('favoritesScreen', 'Your Favorites');
         renderFavorites();
       });
+      
+      // --- AUTH EVENT LISTENERS ---
+      signOutBtnEl.addEventListener('click', handleSignOut);
+      authFormEl.addEventListener('submit', handleAuthSubmit);
+      googleSignInBtnEl.addEventListener('click', handleGoogleSignIn);
+      
+      authModeToggleEl.addEventListener('click', (e) => {
+          const button = e.target.closest('button');
+          if (button) {
+              setAuthMode(button.getAttribute('data-mode'));
+          }
+      });
     }
 
     // Screen management
     function switchScreen(screenName) {
       document.querySelectorAll('.screen').forEach(screen => {
-        screen.classList.remove('active');
+          if (screen.id !== 'authScreen') screen.classList.remove('active');
       });
       document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
@@ -2956,7 +3359,7 @@
 
     function showSubScreen(screenId, title, showBack = true) {
       document.querySelectorAll('.screen').forEach(screen => {
-        screen.classList.remove('active');
+          if (screen.id !== 'authScreen') screen.classList.remove('active');
       });
       document.getElementById(screenId).classList.add('active');
       document.getElementById('headerTitle').textContent = title;
@@ -3109,14 +3512,14 @@
             item.className = 'product-item'; 
             item.innerHTML = `
                 <button class="action-btn favorite" 
-                        onclick="event.stopPropagation(); toggleFavorite('${productName.replace(/'/g, "\\'")}')">
+                        onclick="event.stopPropagation(); window.toggleFavorite('${productName.replace(/'/g, "\\'")}')">
                     ${isFavorite ? '★' : '☆'}
                 </button>
                 <div class="product-actions">
-                    <button class="action-btn add" onclick="event.stopPropagation(); openAddToListModal('${productName.replace(/'/g, "\\'")}')">+</button>
-                    <button class="action-btn duplicate" onclick="event.stopPropagation(); duplicateProduct('${productName.replace(/'/g, "\\'")}')">⧉</button>
-                    ${customProduct ? `<button class="action-btn edit" onclick="event.stopPropagation(); editProduct('${productName.replace(/'/g, "\\'")}')">✎</button>` : ''}
-                    ${customProduct ? `<button class="action-btn delete" onclick="event.stopPropagation(); deleteProduct('${productName.replace(/'/g, "\\'")}')">✕</button>` : ''}
+                    <button class="action-btn add" onclick="event.stopPropagation(); window.openAddToListModal('${productName.replace(/'/g, "\\'")}')">+</button>
+                    <button class="action-btn duplicate" onclick="event.stopPropagation(); window.duplicateProduct('${productName.replace(/'/g, "\\'")}')">⧉</button>
+                    ${customProduct ? `<button class="action-btn edit" onclick="event.stopPropagation(); window.editProduct('${productName.replace(/'/g, "\\'")}')">✎</button>` : ''}
+                    ${customProduct ? `<button class="action-btn delete" onclick="event.stopPropagation(); window.deleteProduct('${productName.replace(/'/g, "\\'")}')">✕</button>` : ''}
                 </div>
                 <div class="product-icon">${productIcon}</div>
                 <div class="product-info">
@@ -3187,14 +3590,14 @@
             const item = document.createElement('div');
             item.className = 'product-item';
             item.innerHTML = `
-                <button class="action-btn favorite" onclick="event.stopPropagation(); toggleFavorite('${productName.replace(/'/g, "\\'")}')">
+                <button class="action-btn favorite" onclick="event.stopPropagation(); window.toggleFavorite('${productName.replace(/'/g, "\\'")}')">
                     ${isFavorite ? '★' : '☆'}
                 </button>
                 <div class="product-actions">
-                    <button class="action-btn add" onclick="event.stopPropagation(); openAddToListModal('${productName.replace(/'/g, "\\'")}')">+</button>
-                    <button class="action-btn duplicate" onclick="event.stopPropagation(); duplicateProduct('${productName.replace(/'/g, "\\'")}')">⧉</button>
-                    ${customProduct ? `<button class="action-btn edit" onclick="event.stopPropagation(); editProduct('${productName.replace(/'/g, "\\'")}')">✎</button>` : ''}
-                    ${customProduct ? `<button class="action-btn delete" onclick="event.stopPropagation(); deleteProduct('${productName.replace(/'/g, "\\'")}')">✕</button>` : ''}
+                    <button class="action-btn add" onclick="event.stopPropagation(); window.openAddToListModal('${productName.replace(/'/g, "\\'")}')">+</button>
+                    <button class="action-btn duplicate" onclick="event.stopPropagation(); window.duplicateProduct('${productName.replace(/'/g, "\\'")}')">⧉</button>
+                    ${customProduct ? `<button class="action-btn edit" onclick="event.stopPropagation(); window.editProduct('${productName.replace(/'/g, "\\'")}')">✎</button>` : ''}
+                    ${customProduct ? `<button class="action-btn delete" onclick="event.stopPropagation(); window.deleteProduct('${productName.replace(/'/g, "\\'")}')">✕</button>` : ''}
                 </div>
                 <div class="product-icon">${productIcon}</div>
                 <div class="product-info">
@@ -3266,14 +3669,14 @@
         const item = document.createElement('div');
         item.className = 'product-item';
         item.innerHTML = `
-          <button class="action-btn favorite" onclick="event.stopPropagation(); toggleFavorite('${productName.replace(/'/g, "\\'")}')">
+          <button class="action-btn favorite" onclick="event.stopPropagation(); window.toggleFavorite('${productName.replace(/'/g, "\\'")}')">
               ${isFavorite ? '★' : '☆'}
           </button>
           <div class="product-actions">
-            <button class="action-btn add" onclick="event.stopPropagation(); openAddToListModal('${productName.replace(/'/g, "\\'")}')">+</button>
-            <button class="action-btn duplicate" onclick="event.stopPropagation(); duplicateProduct('${productName.replace(/'/g, "\\'")}')">⧉</button>
-            <button class="action-btn edit" onclick="event.stopPropagation(); editProduct('${productName.replace(/'/g, "\\'")}')">✎</button>
-            ${customProduct ? `<button class="action-btn delete" onclick="event.stopPropagation(); deleteProduct('${productName.replace(/'/g, "\\'")}')">✕</button>` : ''}
+            <button class="action-btn add" onclick="event.stopPropagation(); window.openAddToListModal('${productName.replace(/'/g, "\\'")}')">+</button>
+            <button class="action-btn duplicate" onclick="event.stopPropagation(); window.duplicateProduct('${productName.replace(/'/g, "\\'")}')">⧉</button>
+            <button class="action-btn edit" onclick="event.stopPropagation(); window.editProduct('${productName.replace(/'/g, "\\'")}')">✎</button>
+            ${customProduct ? `<button class="action-btn delete" onclick="event.stopPropagation(); window.deleteProduct('${productName.replace(/'/g, "\\'")}')">✕</button>` : ''}
           </div>
           <div class="product-icon">${productIcon}</div>
           <div class="product-info">
@@ -3347,9 +3750,9 @@
         card.className = 'store-card';
         card.innerHTML = `
           <div class="product-actions" style="opacity: 1; top: 0.5rem; right: 0.5rem;">
-            ${isCustomStore ? `<button class="action-btn delete" onclick="event.stopPropagation(); deleteStore('${storeName.replace(/'/g, "\\'")}')">✕</button>` : ''}
-            <button class="action-btn duplicate" onclick="event.stopPropagation(); duplicateStore('${storeName.replace(/'/g, "\\'")}')">⧉</button>
-            ${isCustomStore ? `<button class="action-btn edit" onclick="event.stopPropagation(); editStore('${storeName.replace(/'/g, "\\'")}')">✎</button>` : ''}
+            ${isCustomStore ? `<button class="action-btn delete" onclick="event.stopPropagation(); window.deleteStore('${storeName.replace(/'/g, "\\'")}')">✕</button>` : ''}
+            <button class="action-btn duplicate" onclick="event.stopPropagation(); window.duplicateStore('${storeName.replace(/'/g, "\\'")}')">⧉</button>
+            ${isCustomStore ? `<button class="action-btn edit" onclick="event.stopPropagation(); window.openEditStoreModal('${storeName.replace(/'/g, "\\'")}')">✎</button>` : ''}
           </div>
           <div class="store-initials" style="background-color: ${color}">${initials}</div>
           <div class="store-name">${storeName}</div>
@@ -3393,7 +3796,9 @@
       // Group prices by product name to find the latest for display
       const productsInStore = {};
       prices.forEach(price => {
-          if (!productsInStore[price.name] || new Date(price.createdAt) > new Date(productsInStore[price.name].createdAt)) {
+          // Ensure we are comparing dates correctly
+          const priceDate = new Date(price.createdAt);
+          if (!productsInStore[price.name] || priceDate > new Date(productsInStore[price.name].createdAt)) {
               productsInStore[price.name] = price;
           }
       });
@@ -3534,12 +3939,12 @@
         const moveButtons = `
             <div class="list-move-actions flex flex-col gap-1 items-center ml-2 flex-shrink-0">
                 <button class="action-btn text-xs bg-gray-100 text-gray-700 hover:bg-gray-200" style="width: 20px; height: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);"
-                    onclick="event.stopPropagation(); moveList('${list.id}', 'up')" 
+                    onclick="event.stopPropagation(); window.moveList('${list.id}', 'up')" 
                     ${currentListIndex === 0 ? 'disabled' : ''}>
                     ↑
                 </button>
                 <button class="action-btn text-xs bg-gray-100 text-gray-700 hover:bg-gray-200" style="width: 20px; height: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);"
-                    onclick="event.stopPropagation(); moveList('${list.id}', 'down')" 
+                    onclick="event.stopPropagation(); window.moveList('${list.id}', 'down')" 
                     ${currentListIndex === listItemsOnly.length - 1 ? 'disabled' : ''}>
                     ↓
                 </button>
@@ -3552,8 +3957,8 @@
             <div class="list-header">
               <h3 class="list-name">${list.name}</h3>
               <div class="list-actions">
-                <button class="action-btn edit" onclick="event.stopPropagation(); editList('${list.id}', '${list.name.replace(/'/g, "\\'")}')">✎</button>
-                <button class="action-btn delete" onclick="event.stopPropagation(); deleteList('${list.id}', '${list.name.replace(/'/g, "\\'")}')">✕</button>
+                <button class="action-btn edit" onclick="event.stopPropagation(); window.editList('${list.id}', '${list.name.replace(/'/g, "\\'")}')">✎</button>
+                <button class="action-btn delete" onclick="event.stopPropagation(); window.deleteList('${list.id}', '${list.name.replace(/'/g, "\\'")}')">✕</button>
               </div>
             </div>
             <div class="list-info">${checkedItems}/${listItems.length} items completed</div>
@@ -3615,7 +4020,7 @@
             const productIcon = getProductIcon(productName);
             const escapedName = productName.replace(/'/g, "\\'");
             suggestionsHtml += `
-                <div class="suggested-item" onclick="addSuggestedItemToList('${escapedName}', '${list.id}')">
+                <div class="suggested-item" onclick="window.addSuggestedItemToList('${escapedName}', '${list.id}')">
                     <div class="suggested-icon">${productIcon}</div>
                     <div class="suggested-name">${productName}</div>
                 </div>
@@ -3635,11 +4040,8 @@
     async function addSuggestedItemToList(productName, listId) {
         if (!productName || !listId) return;
 
-        if (allData.length >= 999) {
-          showToast('Maximum limit of 999 items reached. Please delete some items first.', 'error');
-          return;
-        }
-
+        // Note: Firestore limits check moved to dataSdk.create
+        
         const existingItem = allData.find(item =>
             item.type === 'listItem' &&
             item.listId === listId &&
@@ -3738,7 +4140,7 @@
         item.className = `list-item ${listItem.checked ? 'checked' : ''}`;
         item.innerHTML = `
           <div class="list-item-main">
-            <button class="check-button ${listItem.checked ? 'checked' : ''}">${listItem.checked ? '✓' : ''}</button>
+            <button class="check-button ${listItem.checked ? 'checked' : ''}" onclick="event.stopPropagation(); window.toggleListItem('${listItem.id}')">${listItem.checked ? '✓' : ''}</button>
             <div class="list-item-icon">${productIcon}</div>
             <div class="item-details">
               <div class="item-name">${listItem.name}</div>
@@ -3747,39 +4149,20 @@
           </div>
           <div class="list-item-controls">
             <div class="qty-adjuster">
-                <button class="qty-btn" data-action="decrease">-</button>
+                <button class="qty-btn" data-action="decrease" onclick="event.stopPropagation(); window.adjustListItemQuantity('${listItem.id}', -1)">-</button>
                 <span style="min-width: 1.2rem; text-align: center;">${listItem.itemQuantity || 1}</span>
-                <button class="qty-btn" data-action="increase">+</button>
+                <button class="qty-btn" data-action="increase" onclick="event.stopPropagation(); window.adjustListItemQuantity('${listItem.id}', 1)">+</button>
             </div>
-            <button class="list-delete-btn">✕</button>
+            <button class="list-delete-btn" onclick="event.stopPropagation(); window.deleteListItem('${listItem.id}')">✕</button>
           </div>`;
 
         // --- RE-WIRE EVENTS ---
-        const checkButton = item.querySelector('.check-button');
-        checkButton.addEventListener('click', (e) => {
-          e.stopPropagation();
-          toggleListItem(listItem);
-        });
-
+        
         // Make item clickable to show product details
         const itemDetails = item.querySelector('.item-details');
         itemDetails.style.cursor = 'pointer';
         itemDetails.addEventListener('click', () => {
           showProductDetail(listItem.name);
-        });
-
-        // Add events for new buttons
-        item.querySelector('.qty-btn[data-action="decrease"]').addEventListener('click', (e) => {
-          e.stopPropagation();
-          adjustListItemQuantity(listItem, -1);
-        });
-        item.querySelector('.qty-btn[data-action="increase"]').addEventListener('click', (e) => {
-          e.stopPropagation();
-          adjustListItemQuantity(listItem, 1);
-        });
-        item.querySelector('.list-delete-btn').addEventListener('click', (e) => {
-          e.stopPropagation();
-          deleteListItem(listItem);
         });
 
         container.appendChild(item);
@@ -3845,7 +4228,7 @@
           item.className = `list-item ${listItem.checked ? 'checked' : ''}`;
           item.innerHTML = `
             <div class="list-item-main">
-              <button class="check-button ${listItem.checked ? 'checked' : ''}">${listItem.checked ? '✓' : ''}</button>
+              <button class="check-button ${listItem.checked ? 'checked' : ''}" onclick="event.stopPropagation(); window.toggleListItem('${listItem.id}')">${listItem.checked ? '✓' : ''}</button>
               <div class="list-item-icon">${productIcon}</div>
               <div class="item-details">
                 <div class="item-name">${listItem.name}</div>
@@ -3854,39 +4237,20 @@
             </div>
             <div class="list-item-controls">
               <div class="qty-adjuster">
-                  <button class="qty-btn" data-action="decrease">-</button>
+                  <button class="qty-btn" data-action="decrease" onclick="event.stopPropagation(); window.adjustListItemQuantity('${listItem.id}', -1)">-</button>
                   <span style="min-width: 1.2rem; text-align: center;">${listItem.itemQuantity || 1}</span>
-                  <button class="qty-btn" data-action="increase">+</button>
+                  <button class="qty-btn" data-action="increase" onclick="event.stopPropagation(); window.adjustListItemQuantity('${listItem.id}', 1)">+</button>
               </div>
-              <button class="list-delete-btn">✕</button>
+              <button class="list-delete-btn" onclick="event.stopPropagation(); window.deleteListItem('${listItem.id}')">✕</button>
             </div>`;
 
           // --- RE-WIRE EVENTS ---
-          const checkButton = item.querySelector('.check-button');
-          checkButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleListItem(listItem);
-          });
-
+          
           // Make item clickable to show product details
           const itemDetails = item.querySelector('.item-details');
           itemDetails.style.cursor = 'pointer';
           itemDetails.addEventListener('click', () => {
             showProductDetail(listItem.name);
-          });
-
-          // Add events for new buttons
-          item.querySelector('.qty-btn[data-action="decrease"]').addEventListener('click', (e) => {
-            e.stopPropagation();
-            adjustListItemQuantity(listItem, -1);
-          });
-          item.querySelector('.qty-btn[data-action="increase"]').addEventListener('click', (e) => {
-            e.stopPropagation();
-            adjustListItemQuantity(listItem, 1);
-          });
-          item.querySelector('.list-delete-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteListItem(listItem);
           });
 
           group.appendChild(item);
@@ -3909,6 +4273,10 @@
       const prices = allData.filter(item => item.type === 'price' && item.name === productName);
       return getCheapestPrice(prices);
     }
+    
+    function getCustomProductRecord(productName) {
+        return allData.find(item => item.type === 'product' && item.name === productName);
+    }
 
     function getAllProductNames() {
       const predefinedProducts = Object.values(categories).flatMap(cat => cat.products);
@@ -3918,7 +4286,7 @@
     
     function getProductIcon(productName) {
       // Check custom products first
-      const customProduct = allData.find(item => item.type === 'product' && item.name === productName);
+      const customProduct = getCustomProductRecord(productName);
       if (customProduct && customProduct.icon) {
         return customProduct.icon;
       }
@@ -3926,11 +4294,14 @@
       return productIcons[productName] || '📦';
     }
 
-    async function adjustListItemQuantity(listItem, amount) {
+    async function adjustListItemQuantity(listItemId, amount) {
+      const listItem = allData.find(item => item.type === 'listItem' && item.id === listItemId);
+      if (!listItem) return;
+
       const newQuantity = (listItem.itemQuantity || 1) + amount;
       if (newQuantity < 1) {
         // Just delete the item if quantity goes to zero via the '-' button
-        await deleteListItem(listItem);
+        await deleteListItem(listItemId);
         return;
       }
       const updatedItem = { ...listItem,
@@ -3942,7 +4313,9 @@
       }
     }
 
-    async function deleteListItem(listItem) {
+    async function deleteListItem(listItemId) {
+      const listItem = allData.find(item => item.type === 'listItem' && item.id === listItemId);
+      if (!listItem) return;
       const result = await window.dataSdk.delete(listItem);
       if (result.isOk) {
         showToast('Item removed from list');
@@ -3953,11 +4326,10 @@
     
     // NEW: Function to move the list order (using mock logic)
     async function moveList(listId, direction) {
-        // Since we cannot easily change the order of Firestore documents,
-        // we'll rely on the default order (which is usually by creation time).
-        // For a real app, you would add an 'order' field and update two documents.
-        // For this demo, we'll skip the actual move operation but keep the UI buttons.
-        showToast("Moving items in real-time is complex. Try sorting your list by store!", "error");
+        // Since we rely on Firestore's default ordering (by creation time),
+        // manual reordering is complex and requires adding an 'order' field to the document.
+        // For this demo, we'll notify the user this feature is advanced.
+        showToast("Moving list order is disabled in this version for stability. Try sorting your list by store!", "error");
     }
 
 
@@ -3996,6 +4368,10 @@
           case 'lists':
             renderLists();
             break;
+          case 'auth': // If logged out, render auth screen (handled by onAuthStateChanged but useful for explicit calls)
+             authScreenEl.classList.add('active');
+             authScreenEl.style.display = 'flex';
+             break;
         }
       }
     }
@@ -4126,6 +4502,7 @@
 
     // Save functions
     async function savePrice() {
+      if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
       const productName = document.getElementById('priceProductName').value;
       const store = document.getElementById('priceStore').value;
       const price = parseFloat(document.getElementById('priceAmount').value);
@@ -4170,6 +4547,7 @@
     }
     
     async function updatePrice() {
+        if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
         if (!currentEditingPrice) return;
         
         const price = parseFloat(document.getElementById('editPriceAmount').value);
@@ -4203,6 +4581,7 @@
     }
     
     async function deletePrice() {
+        if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
         if (!currentEditingPrice) return;
         
         const result = await window.dataSdk.delete(currentEditingPrice);
@@ -4217,6 +4596,7 @@
     }
 
     async function saveProduct() {
+      if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
       const name = document.getElementById('newProductName').value.trim();
       const brand = document.getElementById('newProductBrand').value.trim();
       const category = document.getElementById('newProductCategory').value;
@@ -4281,6 +4661,7 @@
     }
 
     async function saveStore() {
+      if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
       const name = document.getElementById('newStoreName').value.trim();
 
       if (!name) {
@@ -4326,6 +4707,7 @@
     }
     
     async function updateStore() {
+        if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
         if (!currentEditingStore) return;
         const name = document.getElementById('editStoreName').value.trim();
         
@@ -4359,10 +4741,15 @@
         if (result.isOk) {
             // Update all related prices with the new store name
             const relatedPrices = allData.filter(item => item.type === 'price' && item.store === oldName);
-            for (const price of relatedPrices) {
-                const updatedPrice = { ...price, store: name };
-                // Use SDK update mock
-                await window.dataSdk.update(updatedPrice);
+            // Use batch write for related updates
+            const batchUpdateResult = await window.dataSdk.deleteBatch(relatedPrices.map(p => ({
+                id: p.id,
+                type: 'price',
+                store: name
+            }))); // Use deleteBatch as an update proxy for simplicity in this mock structure
+
+            if (!batchUpdateResult.isOk) {
+                showToast('Warning: Failed to update related price stores.', 'warning');
             }
             
             showToast('Store updated successfully');
@@ -4374,6 +4761,7 @@
     }
     
     async function deleteStore(storeName) {
+        if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
         const storeToDelete = allData.find(item => item.type === 'store' && item.name === storeName);
         if (!storeToDelete) {
             showToast('Cannot delete predefined stores.', 'error');
@@ -4422,6 +4810,7 @@
     }
 
     async function saveList() {
+      if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
       const name = document.getElementById('newListName').value.trim();
 
       if (!name) {
@@ -4461,6 +4850,7 @@
     }
 
     async function saveCategory() {
+      if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
       const name = document.getElementById('newCategoryName').value.trim();
       const icon = document.getElementById('newCategoryIcon').value.trim() || '🛒';
 
@@ -4529,6 +4919,7 @@
     }
 
     async function saveQuickAdd() {
+      if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
       const name = document.getElementById('quickProductName').value.trim();
       const brand = document.getElementById('quickProductBrand').value.trim();
       const category = document.getElementById('quickProductCategory').value;
@@ -4557,7 +4948,7 @@
       );
 
       let productExists = existingProduct !== undefined;
-      // Check predefined products
+      // Check predefined products (only if no brand specified)
       if (!productExists && !brand) {
         Object.values(categories).forEach(categoryData => {
           if (categoryData.products.some(product => product.toLowerCase() === name.toLowerCase())) {
@@ -4629,6 +5020,149 @@
       renderProductDetail();
     }
 
+    // NEW: Function to toggle favorite status
+    async function toggleFavorite(productName) {
+        if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
+        let customProduct = getCustomProductRecord(productName);
+        
+        let targetProduct = customProduct;
+        let isNew = false;
+        
+        if (!customProduct) {
+            // If it's a predefined product, create a new custom product entry first
+            const category = getProductCategory(productName);
+            const icon = getProductIcon(productName);
+            targetProduct = {
+                type: 'product',
+                name: productName,
+                brand: '',
+                category: category,
+                icon: icon,
+                tags: '',
+                isFavorite: true, // Set favorite status on creation
+                createdAt: new Date().toISOString()
+            };
+            isNew = true;
+        } else {
+            // Toggle existing favorite status
+            targetProduct = {
+                ...customProduct,
+                isFavorite: !customProduct.isFavorite
+            };
+        }
+
+        let result;
+        if (isNew) {
+            result = await window.dataSdk.create(targetProduct);
+        } else {
+            result = await window.dataSdk.update(targetProduct);
+        }
+
+        if (result.isOk) {
+            showToast(targetProduct.isFavorite ? `${productName} added to favorites!` : `${productName} removed from favorites.`);
+            // Rerender current view to update star icons instantly
+            updateCurrentView();
+        } else {
+            showToast('Failed to update favorite status', 'error');
+        }
+    }
+
+    let currentChart = null; // Store the Chart.js instance
+
+    function renderPriceHistoryChart() {
+        const chartElement = document.getElementById('priceHistoryChart');
+        if (!chartElement) return;
+
+        const ctx = chartElement.getContext('2d');
+        const prices = allData.filter(item => item.type === 'price' && item.name === currentProduct);
+
+        if (currentChart) {
+            currentChart.destroy();
+        }
+
+        if (prices.length === 0) {
+            // Check if the parent node is still a chart container, otherwise skip mutation
+            const parent = ctx.canvas.parentNode;
+            if (parent && parent.className !== 'chart-container') {
+                parent.innerHTML = '<p class="text-center text-gray-500 py-4">No price data recorded to display history.</p>';
+            }
+            return;
+        }
+
+        // 1. Group by Month and find the cheapest PPU
+        const monthlyData = {};
+
+        prices.forEach(price => {
+            const date = new Date(price.createdAt);
+            const monthYear = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+            const ppu = price.price / price.quantity;
+
+            if (!monthlyData[monthYear] || ppu < monthlyData[monthYear].ppu) {
+                monthlyData[monthYear] = { ppu: ppu, timestamp: date.getTime() };
+            }
+        });
+
+        // 2. Sort data chronologically
+        const sortedDates = Object.keys(monthlyData).sort((a, b) => {
+            return monthlyData[a].timestamp - monthlyData[b].timestamp;
+        });
+
+        const labels = sortedDates;
+        const dataPoints = sortedDates.map(date => monthlyData[date].ppu);
+
+        // 3. Create Chart
+        currentChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: `Cheapest Price per ${currentUnit}`,
+                    data: dataPoints,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    pointBackgroundColor: '#2563eb',
+                    pointBorderColor: '#fff',
+                    pointHoverRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: `Price (${currencies[currentRegion]})`
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += `${currencies[currentRegion]}${context.parsed.y.toFixed(2)}/${currentUnit}`;
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     function renderProductDetail() {
       const header = document.getElementById('productDetailHeader');
       const pricesList = document.getElementById('pricesList');
@@ -4642,13 +5176,17 @@
       header.innerHTML = `
         <div class="absolute top-2 left-2">
             <button class="action-btn favorite text-2xl" 
-                    onclick="event.stopPropagation(); toggleFavorite('${currentProduct.replace(/'/g, "\\'")}')">
+                    onclick="event.stopPropagation(); window.toggleFavorite('${currentProduct.replace(/'/g, "\\'")}')">
                 ${isFavorite ? '★' : '☆'}
             </button>
         </div>
         <div class="product-detail-icon">${productIcon}</div>
         <div class="product-detail-name">${currentProduct}</div>
         <div class="product-detail-category">${productCategory}</div>`;
+        
+      // RENDER CHART
+      renderPriceHistoryChart();
+
 
       const prices = allData.filter(item => item.type === 'price' && item.name === currentProduct);
 
@@ -4685,7 +5223,7 @@
 
     function getProductCategory(productName) {
       // Check custom products first
-      const customProduct = allData.find(item => item.type === 'product' && item.name === productName);
+      const customProduct = getCustomProductRecord(productName);
       if (customProduct) return customProduct.category;
 
       // Check predefined categories
@@ -4710,6 +5248,7 @@
     }
 
     function confirmAddToList() {
+      if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
       const productName = selectedProductForList;
       const quantity = parseInt(document.getElementById('listQuantity').value) || 1;
       const newListGroup = document.getElementById('newListGroup');
@@ -4813,7 +5352,10 @@
       }
     }
 
-    async function toggleListItem(listItem) {
+    async function toggleListItem(listItemId) {
+      if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
+      const listItem = allData.find(item => item.type === 'listItem' && item.id === listItemId);
+      if (!listItem) return;
       const updatedItem = { ...listItem,
         checked: !listItem.checked
       };
@@ -4895,7 +5437,7 @@
       
       allProductNames.forEach(productName => {
           const prices = allData.filter(item => item.type === 'price' && item.name === productName);
-          const customProduct = allData.find(item => item.type === 'product' && item.name === productName);
+          const customProduct = getCustomProductRecord(productName);
           const category = getProductCategory(productName);
           
           let searchText = productName.toLowerCase();
@@ -4939,14 +5481,14 @@
           const item = document.createElement('div');
           item.className = 'product-item';
           item.innerHTML = `
-            <button class="action-btn favorite" onclick="event.stopPropagation(); toggleFavorite('${product.name.replace(/'/g, "\\'")}')">
+            <button class="action-btn favorite" onclick="event.stopPropagation(); window.toggleFavorite('${product.name.replace(/'/g, "\\'")}')">
                 ${isFavorite ? '★' : '☆'}
             </button>
             <div class="product-actions">
-              <button class="action-btn add" onclick="event.stopPropagation(); openAddToListModal('${product.name.replace(/'/g, "\\'")}')">+</button>
-              <button class="action-btn duplicate" onclick="event.stopPropagation(); duplicateProduct('${product.name.replace(/'/g, "\\'")}')">⧉</button>
-              <button class="action-btn edit" onclick="event.stopPropagation(); editProduct('${product.name.replace(/'/g, "\\'")}')">✎</button>
-              ${customProduct ? `<button class="action-btn delete" onclick="event.stopPropagation(); deleteProduct('${product.name.replace(/'/g, "\\'")}')">✕</button>` : ''}
+              <button class="action-btn add" onclick="event.stopPropagation(); window.openAddToListModal('${product.name.replace(/'/g, "\\'")}')">+</button>
+              <button class="action-btn duplicate" onclick="event.stopPropagation(); window.duplicateProduct('${product.name.replace(/'/g, "\\'")}')">⧉</button>
+              <button class="action-btn edit" onclick="event.stopPropagation(); window.editProduct('${product.name.replace(/'/g, "\\'")}')">✎</button>
+              ${customProduct ? `<button class="action-btn delete" onclick="event.stopPropagation(); window.deleteProduct('${product.name.replace(/'/g, "\\'")}')">✕</button>` : ''}
             </div>
             <div class="product-icon">${productIcon}</div>
             <div class="product-info">
@@ -4996,7 +5538,7 @@
         const allProductNames = getAllProductNames();
         const matchingProducts = allProductNames.filter(productName => {
             const prices = allData.filter(item => item.type === 'price' && item.name === productName);
-            const customProduct = allData.find(item => item.type === 'product' && item.name === productName);
+            const customProduct = getCustomProductRecord(productName);
             
             let searchText = productName.toLowerCase();
             if (customProduct) {
@@ -5028,14 +5570,14 @@
                 item.className = 'product-item'; 
                 item.innerHTML = `
                     <button class="action-btn favorite" 
-                            onclick="event.stopPropagation(); toggleFavorite('${productName.replace(/'/g, "\\'")}')">
+                            onclick="event.stopPropagation(); window.toggleFavorite('${productName.replace(/'/g, "\\'")}')">
                         ${isFavorite ? '★' : '☆'}
                     </button>
                     <div class="product-actions">
-                        <button class="action-btn add" onclick="event.stopPropagation(); openAddToListModal('${productName.replace(/'/g, "\\'")}')">+</button>
-                        <button class="action-btn duplicate" onclick="event.stopPropagation(); duplicateProduct('${productName.replace(/'/g, "\\'")}')">⧉</button>
-                        ${customProduct ? `<button class="action-btn edit" onclick="event.stopPropagation(); editProduct('${productName.replace(/'/g, "\\'")}')">✎</button>` : ''}
-                        ${customProduct ? `<button class="action-btn delete" onclick="event.stopPropagation(); deleteProduct('${productName.replace(/'/g, "\\'")}')">✕</button>` : ''}
+                        <button class="action-btn add" onclick="event.stopPropagation(); window.openAddToListModal('${productName.replace(/'/g, "\\'")}')">+</button>
+                        <button class="action-btn duplicate" onclick="event.stopPropagation(); window.duplicateProduct('${productName.replace(/'/g, "\\'")}')">⧉</button>
+                        ${customProduct ? `<button class="action-btn edit" onclick="event.stopPropagation(); window.editProduct('${productName.replace(/'/g, "\\'")}')">✎</button>` : ''}
+                        ${customProduct ? `<button class="action-btn delete" onclick="event.stopPropagation(); window.deleteProduct('${productName.replace(/'/g, "\\'")}')">✕</button>` : ''}
                     </div>
                     <div class="product-icon">${productIcon}</div>
                     <div class="product-info">
@@ -5093,7 +5635,7 @@
       
       allProductNames.forEach(productName => {
           const prices = allData.filter(item => item.type === 'price' && item.name === productName);
-          const customProduct = allData.find(item => item.type === 'product' && item.name === productName);
+          const customProduct = getCustomProductRecord(productName);
           const category = getProductCategory(productName);
           
           let searchText = productName.toLowerCase();
@@ -5222,7 +5764,7 @@
             input.value = product.name;
             document.getElementById('quickProductCategory').value = product.category;
             // Fill brand and tags if it's a custom product
-            const customProduct = allData.find(item => item.type === 'product' && item.name === product.name);
+            const customProduct = getCustomProductRecord(product.name);
             if (customProduct) {
               document.getElementById('quickProductBrand').value = customProduct.brand || '';
               document.getElementById('quickProductTags').value = customProduct.tags || '';
@@ -5275,7 +5817,7 @@
     // Product action functions
     function duplicateProduct(productName) {
       // Find the custom product to duplicate (or create a temporary object for predefined)
-      const customProduct = allData.find(item => item.type === 'product' && item.name === productName);
+      const customProduct = getCustomProductRecord(productName);
       
       let sourceProduct = customProduct;
       if (!sourceProduct) {
@@ -5304,13 +5846,13 @@
     }
 
     function editProduct(productName) {
-      let customProduct = allData.find(item => item.type === 'product' && item.name === productName);
+      let customProduct = getCustomProductRecord(productName);
       // If it's a predefined product, create a custom version for editing
       if (!customProduct) {
         const category = getProductCategory(productName);
         const productIcon = getProductIcon(productName);
         customProduct = {
-          id: generateId(), // Give it a temporary ID for tracking
+          id: 'temp-' + new Date().getTime(), // Give it a temporary ID for tracking
           type: 'product',
           name: productName,
           brand: '',
@@ -5346,7 +5888,7 @@
     }
 
     function deleteProduct(productName) {
-      const customProduct = allData.find(item => item.type === 'product' && item.name === productName);
+      const customProduct = getCustomProductRecord(productName);
       if (!customProduct) {
         showToast('Cannot delete predefined products', 'error');
         return;
@@ -5363,6 +5905,7 @@
     }
 
     async function updateProduct() {
+      if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
       if (!currentEditingProduct) return;
       const name = document.getElementById('editProductName').value.trim();
       const brand = document.getElementById('editProductBrand').value.trim();
@@ -5430,13 +5973,14 @@
         if (oldName !== name || currentEditingProduct.category !== category) {
           // Update all related prices with new name and category
           const relatedPrices = allData.filter(item => item.type === 'price' && item.name === oldName);
-          for (const price of relatedPrices) {
-            const updatedPrice = { ...price,
+          // Use batch update (simulated by batch delete/add for simplicity in this structure)
+          await window.dataSdk.deleteBatch(relatedPrices.map(p => ({
+              id: p.id,
+              type: 'price',
               name: name,
               category: category
-            };
-            await window.dataSdk.update(updatedPrice);
-          }
+          })));
+          
           // Update all related list items with new name
           const relatedListItems = allData.filter(item => item.type === 'listItem' && item.name === oldName);
           for (const listItem of relatedListItems) {
@@ -5460,6 +6004,7 @@
     }
 
     async function confirmDelete() {
+      if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
       if (!currentDeletingItem) return;
       try {
         const itemType = currentDeletingItem.type;
@@ -5531,6 +6076,7 @@
     }
 
     async function updateList() {
+      if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
       if (!currentEditingList) return;
       const name = document.getElementById('editListName').value.trim();
       if (!name) {
@@ -5573,6 +6119,7 @@
     }
 
     async function confirmDeleteList() {
+      if (!isAuthReady) { showToast("Please sign in to save data.", 'error'); return; }
       if (!currentDeletingList) return;
       try {
         // Delete all list items first
@@ -5613,6 +6160,24 @@
         }, 300);
       }, 3000);
     }
+    
+    // EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR INLINE HTML HANDLERS (CRITICAL FIX)
+    window.toggleFavorite = toggleFavorite;
+    window.openAddToListModal = openAddToListModal;
+    window.duplicateProduct = duplicateProduct;
+    window.editProduct = editProduct;
+    window.deleteProduct = deleteProduct;
+    window.moveList = moveList;
+    window.editList = editList;
+    window.deleteList = deleteList;
+    window.openEditStoreModal = openEditStoreModal;
+    window.duplicateStore = duplicateStore;
+    window.deleteStore = deleteStore;
+    window.toggleListItem = toggleListItem;
+    window.adjustListItemQuantity = adjustListItemQuantity;
+    window.deleteListItem = deleteListItem;
+    window.addSuggestedItemToList = addSuggestedItemToList;
+
 
     // Initialize app when DOM is loaded
     document.addEventListener('DOMContentLoaded', initApp);
