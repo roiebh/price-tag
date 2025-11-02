@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Note Keeper</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            min-height: 100vh;
+        }
+        .note-card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s;
+        }
+        .note-card:hover {
+             transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="app" class="max-w-3xl mx-auto bg-white p-6 md:p-10 rounded-xl shadow-2xl">
+        <header class="mb-8 border-b pb-4">
+            <h1 class="text-4xl font-extrabold text-indigo-700">Secure Note Keeper</h1>
+            <p class="text-gray-500 mt-1">Real-time data synchronization with Firestore.</p>
+        </header>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="text-center py-10">
+            <div class="animate-spin inline-block w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
+            <p class="mt-2 text-indigo-600 font-medium">Initializing App and Authenticating...</p>
+        </div>
+        
+        <!-- Authentication Container (Shown when logged out) -->
+        <div id="auth-container" class="hidden max-w-md mx-auto py-10">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">User Account</h2>
+            
+            <div class="p-6 bg-gray-50 rounded-xl shadow-lg border border-gray-100">
+                <div id="auth-mode-toggle" class="flex mb-6 rounded-lg bg-gray-200 p-0.5">
+                    <button data-mode="login" class="flex-1 py-2 text-sm font-bold rounded-lg bg-indigo-600 text-white shadow-md transition duration-200">
+                        Sign In
+                    </button>
+                    <button data-mode="register" class="flex-1 py-2 text-sm font-bold rounded-lg text-gray-700 hover:bg-white transition duration-200">
+                        Register
+                    </button>
+                </div>
+        
+                <form id="auth-form" class="space-y-5">
+                    <div>
+                        <label for="auth-email" class="block text-sm font-medium text-gray-700">Email Address</label>
+                        <input type="email" id="auth-email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="auth-password" class="block text-sm font-medium text-gray-700">Password</label>
+                        <input type="password" id="auth-password" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <p class="text-xs text-gray-400 mt-1">Password must be at least 6 characters.</p>
+                    </div>
+                    
+                    <button type="submit" id="auth-submit-btn" class="w-full py-2 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150">
+                        Sign In
+                    </button>
+                    <p id="auth-error-message" class="text-red-500 text-sm text-center hidden"></p>
+                </form>
+
+                <!-- Divider -->
+                <div class="my-6 flex items-center">
+                    <div class="flex-grow border-t border-gray-300"></div>
+                    <span class="flex-shrink mx-4 text-gray-500 text-sm">OR</span>
+                    <div class="flex-grow border-t border-gray-300"></div>
+                </div>
+
+                <!-- Google Sign-In Button -->
+                <button id="google-sign-in-btn" class="w-full flex items-center justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm text-base font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150">
+                    <!-- Google SVG Icon -->
+                    <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 9.38v2.62h6.15c-.25 1.4-1.12 2.62-2.33 3.4l2.04 1.6C19.82 17.65 22 14.88 22 12c0-2.88-.75-5.5-2.06-7.79l-2.3 1.83C19.16 6.55 20 9.17 20 12c0 2.21-.6 4.31-1.63 6.1l-2.06-1.6c.86-1.5 1.34-3.23 1.34-5.02z" fill="#4285F4"/>
+                        <path d="M11 20.84c.83 0 1.63-.14 2.39-.41l2.06 1.6c-1.28.84-2.78 1.27-4.45 1.27-2.92 0-5.5-.96-7.33-2.58l2.25-1.77C6.55 20.2 8.76 20.84 11 20.84z" fill="#34A853"/>
+                        <path d="M4 12c0-1.21.31-2.37.86-3.4l-2.25-1.77C.88 8.08 0 9.98 0 12c0 2.02.66 3.92 1.85 5.58l2.25-1.77C4.31 14.37 4 13.21 4 12z" fill="#FBBC05"/>
+                        <path d="M11 3.16c1.64 0 3.13.56 4.32 1.55l1.79-1.79C15.5 1.47 13.78.84 11 .84c-2.76 0-5.26 1.05-7.14 2.8L6.11 5.37C7.4 4.07 9.1 3.16 11 3.16z" fill="#EA4335"/>
+                    </svg>
+                    Sign in with Google
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content Area (Shown when logged in) -->
+        <div id="content" class="hidden">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                <div class="mb-3 md:mb-0">
+                    <p class="text-sm font-semibold text-indigo-600">Current User ID:</p>
+                    <p id="user-id-display" class="break-all text-xs font-mono bg-indigo-100 p-1 rounded"></p>
+                </div>
+                <button id="sign-out-btn" class="px-4 py-2 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 transition duration-150 shadow-md">
+                    Sign Out
+                </button>
+            </div>
+
+            <!-- Add Note Form -->
+            <section class="mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Add a New Note</h2>
+                <form id="add-note-form" class="space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <div>
+                        <label for="note-title" class="block text-sm font-medium text-gray-700">Title</label>
+                        <input type="text" id="note-title" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="note-content" class="block text-sm font-medium text-gray-700">Content</label>
+                        <textarea id="note-content" rows="3" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                    </div>
+                    <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150">
+                        Save Note
+                    </button>
+                    <p id="error-message" class="text-red-500 text-sm mt-2 hidden"></p>
+                </form>
+            </section>
+
+            <!-- Notes List -->
+            <section>
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">My Saved Notes</h2>
+                <div id="notes-list" class="space-y-4">
+                    <!-- Notes will be injected here -->
+                    <p id="no-notes-message" class="text-gray-500 italic hidden">No notes found. Start by adding one above!</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Firebase Imports and Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, addDoc, onSnapshot, collection, query, where, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables provided by the environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app, db, auth;
+        let userId = null;
+        let authMode = 'login'; // 'login' or 'register'
+        let unsubscribeFromNotes = null; // Variable to hold the Firestore unsubscribe function
+        let isFirstLoad = true; // Flag to control initial token usage
+
+        const loadingEl = document.getElementById('loading');
+        const contentEl = document.getElementById('content');
+        const authContainerEl = document.getElementById('auth-container');
+        const userIdDisplayEl = document.getElementById('user-id-display');
+        const notesListEl = document.getElementById('notes-list');
+        const formEl = document.getElementById('add-note-form');
+        const errorEl = document.getElementById('error-message');
+        const signOutBtn = document.getElementById('sign-out-btn');
+        const noNotesMessage = document.getElementById('no-notes-message');
+        
+        // New Auth elements
+        const authModeToggleEl = document.getElementById('auth-mode-toggle');
+        const authFormEl = document.getElementById('auth-form');
+        const authEmailInput = document.getElementById('auth-email');
+        const authPasswordInput = document.getElementById('auth-password');
+        const authSubmitBtn = document.getElementById('auth-submit-btn');
+        const authErrorEl = document.getElementById('auth-error-message');
+        const googleSignInBtn = document.getElementById('google-sign-in-btn');
+
+
+        // --- Utility Functions ---
+
+        // Function to get the correct Firestore collection path for private data
+        function getUserNotesCollectionRef() {
+            if (!db || !userId) return null;
+            // Path: /artifacts/{appId}/users/{userId}/notes
+            const path = `artifacts/${appId}/users/${userId}/notes`;
+            return collection(db, path);
+        }
+
+        // Display an error message to the note form area
+        function displayError(message) {
+            errorEl.textContent = message;
+            errorEl.classList.remove('hidden');
+            setTimeout(() => errorEl.classList.add('hidden'), 5000);
+            console.error(message);
+        }
+        
+        // Display an error message to the auth form area
+        function displayAuthError(message) {
+            authErrorEl.textContent = message;
+            authErrorEl.classList.remove('hidden');
+            setTimeout(() => authErrorEl.classList.add('hidden'), 5000);
+            console.error(message);
+        }
+
+        // Function to explicitly stop Firestore listeners
+        function unsubscribeAllListeners() {
+            if (unsubscribeFromNotes) {
+                unsubscribeFromNotes();
+                unsubscribeFromNotes = null;
+                console.log("Firestore notes listener unsubscribed.");
+            }
+        }
+
+        // --- Auth Mode Toggle ---
+        function setAuthMode(mode) {
+            authMode = mode;
+            const loginBtn = authModeToggleEl.querySelector('[data-mode="login"]');
+            const registerBtn = authModeToggleEl.querySelector('[data-mode="register"]');
+            
+            if (mode === 'login') {
+                loginBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+                loginBtn.classList.remove('text-gray-700', 'hover:bg-white');
+                registerBtn.classList.remove('bg-indigo-600', 'text-white', 'shadow-md');
+                registerBtn.classList.add('text-gray-700', 'hover:bg-white');
+                authSubmitBtn.textContent = 'Sign In';
+            } else {
+                registerBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+                registerBtn.classList.remove('text-gray-700', 'hover:bg-white');
+                loginBtn.classList.remove('bg-indigo-600', 'text-white', 'shadow-md');
+                loginBtn.classList.add('text-gray-700', 'hover:bg-white');
+                authSubmitBtn.textContent = 'Register';
+            }
+            authErrorEl.classList.add('hidden'); // Clear error when switching mode
+        }
+
+        // --- Firebase Initialization and Auth ---
+
+        async function initFirebase() {
+            loadingEl.classList.remove('hidden');
+            contentEl.classList.add('hidden');
+            authContainerEl.classList.add('hidden');
+            
+            if (!firebaseConfig) {
+                displayError("Firebase configuration is missing.");
+                return;
+            }
+
+            try {
+                // Set Firestore log level for debugging
+                setLogLevel('debug');
+                
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Set auth persistence to local to survive browser refreshes
+                await setPersistence(auth, browserLocalPersistence);
+
+                // FIX 1: Handle mandatory initial token sign-in *outside* the listener.
+                // This will establish the initial session (or anon session) but won't interfere 
+                // with explicit sign-out later. We only do this on the first load.
+                if (isFirstLoad) {
+                     if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken).catch(e => console.error("Custom token sign-in failed:", e));
+                    } else {
+                        await signInAnonymously(auth).catch(e => console.error("Anonymous sign-in failed:", e));
+                    }
+                    isFirstLoad = false;
+                }
+                
+                // Set up the authentication state listener
+                onAuthStateChanged(auth, async (user) => {
+                    loadingEl.classList.add('hidden'); // Always hide loading after initial check
+                    
+                    if (user) {
+                        userId = user.uid;
+                        userIdDisplayEl.textContent = userId;
+                        contentEl.classList.remove('hidden');
+                        authContainerEl.classList.add('hidden');
+                        // Added a short delay to mitigate race condition with token propagation.
+                        setTimeout(loadNotes, 50); 
+                    } else {
+                        // FIX 2: When user is null (either signed out or session expired),
+                        // we ONLY show the login UI and explicitly *do not* attempt to sign in anonymously 
+                        // or with the custom token again.
+                        userId = null;
+                        userIdDisplayEl.textContent = '...';
+                        notesListEl.innerHTML = ''; // Clear notes
+                        contentEl.classList.add('hidden');
+                        authContainerEl.classList.remove('hidden');
+                        
+                        // FIX 3: Unsubscribe the listener immediately upon sign out to prevent permission errors
+                        unsubscribeAllListeners();
+                    }
+                });
+
+            } catch (error) {
+                displayError(`Firebase Initialization Failed: ${error.message}`);
+                loadingEl.classList.add('hidden');
+            }
+        }
+        
+        // Handle Email/Password Registration and Login
+        async function handleAuthSubmit(event) {
+            event.preventDefault();
+            authErrorEl.classList.add('hidden');
+            
+            const email = authEmailInput.value.trim();
+            const password = authPasswordInput.value;
+
+            if (password.length < 6) {
+                displayAuthError("Password must be at least 6 characters.");
+                return;
+            }
+
+            try {
+                if (authMode === 'register') {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                    // onAuthStateChanged handles the success case (UI switch)
+                } else { // 'login'
+                    await signInWithEmailAndPassword(auth, email, password);
+                    // onAuthStateChanged handles the success case (UI switch)
+                }
+            } catch (error) {
+                let errorMessage = "An unknown authentication error occurred.";
+                // Map Firebase Auth error codes to user-friendly messages
+                switch (error.code) {
+                    case 'auth/invalid-email':
+                        errorMessage = 'Invalid email format.';
+                        break;
+                    case 'auth/user-not-found':
+                    case 'auth/wrong-password':
+                        errorMessage = 'Invalid email or password.';
+                        break;
+                    case 'auth/email-already-in-use':
+                        errorMessage = 'This email is already registered. Try signing in.';
+                        break;
+                    case 'auth/weak-password':
+                        errorMessage = 'Password is too weak. Must be at least 6 characters.';
+                        break;
+                    default:
+                        errorMessage = error.message;
+                        break;
+                }
+                displayAuthError(errorMessage);
+            }
+        }
+
+        // Handle Google Sign-In
+        async function handleGoogleSignIn() {
+            authErrorEl.classList.add('hidden');
+            
+            try {
+                const provider = new GoogleAuthProvider();
+                // Sign in using a pop-up window
+                await signInWithPopup(auth, provider);
+                // onAuthStateChanged listener handles the success and UI switch
+                
+            } catch (error) {
+                let errorMessage = "Google Sign-In Failed.";
+                
+                // Check if the error object has a code property
+                if (error.code) {
+                    // Map common provider errors
+                    if (error.code === 'auth/popup-closed-by-user') {
+                        errorMessage = 'Sign-in window closed. Please try again.';
+                    } else if (error.code === 'auth/cancelled-popup-request') {
+                        errorMessage = 'Sign-in cancelled. Did you already have a pop-up open?';
+                    } else if (error.code === 'auth/account-exists-with-different-credential') {
+                        errorMessage = 'An account already exists with this email using a different login method (e.g., email/password).';
+                    } else {
+                        errorMessage = `Error: ${error.code}`;
+                    }
+                } else {
+                    errorMessage = error.message;
+                }
+
+                displayAuthError(errorMessage);
+                console.error("Google Sign-In Error:", error);
+            }
+        }
+
+
+        // --- Firestore Data Operations ---
+
+        // 1. Load notes and listen for real-time updates
+        function loadNotes() {
+            const notesRef = getUserNotesCollectionRef();
+            if (!notesRef) return;
+            
+            // Capture the unsubscribe function provided by onSnapshot
+            unsubscribeFromNotes = onSnapshot(notesRef, (snapshot) => {
+                notesListEl.innerHTML = ''; // Clear existing notes
+                const notes = [];
+                snapshot.forEach((doc) => {
+                    notes.push({ id: doc.id, ...doc.data() });
+                });
+
+                if (notes.length === 0) {
+                    noNotesMessage.classList.remove('hidden');
+                } else {
+                    noNotesMessage.classList.add('hidden');
+                    // Sort notes by timestamp (most recent first) before rendering
+                    notes.sort((a, b) => b.createdAt - a.createdAt);
+                    notes.forEach(note => renderNote(note));
+                }
+            }, (error) => {
+                displayError(`Error fetching notes: ${error.message}`);
+            });
+        }
+
+        // 2. Add a new note
+        async function addNote(event) {
+            event.preventDefault();
+            
+            const titleInput = document.getElementById('note-title');
+            const contentInput = document.getElementById('note-content');
+            
+            const title = titleInput.value.trim();
+            const content = contentInput.value.trim();
+
+            if (!title || !content) return;
+            
+            const notesRef = getUserNotesCollectionRef();
+            if (!notesRef) {
+                displayError("Authentication not ready. Please wait.");
+                return;
+            }
+
+            try {
+                await addDoc(notesRef, {
+                    title: title,
+                    content: content,
+                    createdAt: Date.now()
+                });
+                
+                // Clear the form inputs after successful save
+                titleInput.value = '';
+                contentInput.value = '';
+                
+            } catch (error) {
+                displayError(`Failed to save note: ${error.message}`);
+            }
+        }
+
+        // 3. Delete a note
+        async function deleteNote(noteId) {
+            const notesRef = getUserNotesCollectionRef();
+            if (!notesRef) {
+                displayError("Authentication not ready. Cannot delete.");
+                return;
+            }
+
+            try {
+                // The document reference path: /artifacts/{appId}/users/{userId}/notes/{noteId}
+                const docRef = doc(notesRef, noteId);
+                await deleteDoc(docRef);
+            } catch (error) {
+                displayError(`Failed to delete note: ${error.message}`);
+            }
+        }
+
+        // --- UI Rendering ---
+
+        function renderNote(note) {
+            const noteEl = document.createElement('div');
+            noteEl.className = 'note-card bg-white p-4 rounded-lg border border-gray-100 flex justify-between items-start';
+            noteEl.innerHTML = `
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">${note.title}</h3>
+                    <p class="text-gray-600 mt-1 whitespace-pre-wrap">${note.content}</p>
+                    <p class="text-xs text-gray-400 mt-2">Saved: ${new Date(note.createdAt).toLocaleString()}</p>
+                </div>
+                <button data-id="${note.id}" class="delete-btn text-red-500 hover:text-red-700 p-2 rounded-full transition duration-150" title="Delete Note">
+                    <!-- Icon for Delete -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            `;
+            
+            notesListEl.prepend(noteEl); // Prepend for newest notes at the top
+        }
+        
+        // --- Event Listeners and Setup ---
+
+        // Sign Out Handler
+        signOutBtn.addEventListener('click', async () => {
+            if (auth) {
+                try {
+                    // This signs out the user, which triggers onAuthStateChanged with user=null
+                    await signOut(auth);
+                    displayError('Successfully signed out! Please sign in or register below.'); 
+                    console.log('User signed out.');
+                } catch (error) {
+                    displayError(`Sign out failed: ${error.message}`);
+                }
+            }
+        });
+
+        // Form submission handler for notes
+        formEl.addEventListener('submit', addNote);
+        
+        // Auth form submission handler
+        authFormEl.addEventListener('submit', handleAuthSubmit);
+
+        // Auth mode toggle handler
+        authModeToggleEl.addEventListener('click', (e) => {
+            const button = e.target.closest('button');
+            if (button) {
+                setAuthMode(button.getAttribute('data-mode'));
+            }
+        });
+
+        // Google Sign-In button handler
+        googleSignInBtn.addEventListener('click', handleGoogleSignIn);
+
+
+        // Delegation for Delete button clicks
+        notesListEl.addEventListener('click', (e) => {
+            const deleteButton = e.target.closest('.delete-btn');
+            if (deleteButton) {
+                const noteId = deleteButton.getAttribute('data-id');
+                if (noteId) {
+                    deleteNote(noteId);
+                    console.warn('Note deleted instantly.');
+                }
+            }
+        });
+
+        // Initialize everything on window load
+        window.onload = () => {
+            setAuthMode('login'); // Set initial auth mode
+            initFirebase();
+        };
+    </script>
+
+</body>
+</html>
